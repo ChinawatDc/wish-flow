@@ -16,6 +16,9 @@ type EventItem = {
   status: string;
   isExpired: boolean;
   viewCount: number;
+  guestbookEnabled: boolean;
+  guestAccessMode: "PIN" | "PUBLIC";
+  pendingWishes: number;
   template: { id: string; slug: string; name: string } | null;
   share: {
     listingId: string;
@@ -315,6 +318,11 @@ function EventsPageInner() {
                           แชร์แล้ว ♥{event.share.heartCount} · {event.share.useCount} คน
                         </span>
                       )}
+                      {event.guestAccessMode === "PUBLIC" && (
+                        <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                          🌐 สาธารณะ
+                        </span>
+                      )}
                     </h2>
                     <p className="mt-1 text-sm text-rose-400">
                       {event.template?.name ?? "ยังไม่เลือกเทมเพลต"} · เปิดดู{" "}
@@ -338,6 +346,19 @@ function EventsPageInner() {
                     >
                       🎨 แก้ไข
                     </Link>
+                    {event.guestbookEnabled && (
+                      <Link
+                        href={`/events/${event.id}/wishes`}
+                        className="relative rounded-xl border-2 border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+                      >
+                        📖 คำอวยพร
+                        {event.pendingWishes > 0 && (
+                          <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-rose-500 px-1 text-xs font-bold text-white">
+                            {event.pendingWishes > 99 ? "99+" : event.pendingWishes}
+                          </span>
+                        )}
+                      </Link>
+                    )}
                     <button
                       type="button"
                       onClick={() => openQr(event.id, event.name)}

@@ -33,6 +33,10 @@ export async function POST(_request: Request, { params }: Params) {
   }
 
   const token = await issueUnlockToken(id);
+  await prisma.event.update({
+    where: { id },
+    data: { viewCount: { increment: 1 } },
+  });
   const jar = await cookies();
   jar.set(unlockCookieName(id), token, {
     httpOnly: true,

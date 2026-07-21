@@ -21,6 +21,11 @@ export async function GET() {
             currentRevisionId: true,
           },
         },
+        _count: {
+          select: {
+            guestbookEntries: { where: { status: "PENDING" } },
+          },
+        },
       },
     });
 
@@ -37,6 +42,9 @@ export async function GET() {
           status: expired ? "expired" : e.status,
           isExpired: expired,
           viewCount: e.viewCount,
+          guestbookEnabled: e.guestbookEnabled,
+          guestAccessMode: e.guestAccessMode,
+          pendingWishes: e._count.guestbookEntries,
           template: e.template,
           share: e.cardListing
             ? {
