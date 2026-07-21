@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { ExpiredCardOverlay } from "@/components/ExpiredCardOverlay";
 import { StepRenderer } from "@/components/steps/StepRenderer";
 import type { StepDef, StepsSchema } from "@/lib/validation";
 
@@ -27,6 +28,7 @@ export default function GuestViewPage() {
   const id = params.id;
   const [data, setData] = useState<ViewPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [expired, setExpired] = useState(false);
   const sent = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -35,6 +37,11 @@ export default function GuestViewPage() {
       const res = await fetch(`/api/e/${id}/view`);
       const json = await res.json();
       if (cancelled) return;
+      if (res.status === 410) {
+        setExpired(true);
+        setError(json.error || "อีเวนต์นี้หมดอายุแล้ว");
+        return;
+      }
       if (!res.ok) {
         setError(json.error || "กรุณากรอก PIN ก่อนเข้าชม");
         return;
@@ -63,6 +70,14 @@ export default function GuestViewPage() {
         deviceClass: detectDeviceClass(),
       }),
     });
+  }
+
+  if (expired) {
+    return (
+      <main className="relative grid min-h-screen place-items-center bg-gradient-to-b from-pink-100 to-rose-50">
+        <ExpiredCardOverlay />
+      </main>
+    );
   }
 
   if (error) {

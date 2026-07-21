@@ -32,6 +32,9 @@ export async function GET(_request: Request, { params }: Params) {
   if (!event || event.status !== "active") {
     return jsonError("ไม่พบอีเวนต์นี้", 404);
   }
+  if (event.expiresAt && event.expiresAt.getTime() < Date.now()) {
+    return jsonError("อีเวนต์นี้หมดอายุแล้ว", 410);
+  }
 
   if (!event.template && !event.templateVersion) {
     return jsonError("อีเวนต์นี้ยังไม่ได้เลือกเทมเพลต", 400);

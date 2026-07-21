@@ -10,6 +10,7 @@ export interface StorageAdapter {
   save(params: {
     eventId?: string;
     templateId?: string;
+    revisionId?: string;
     filename: string;
     buffer: Buffer;
   }): Promise<string>;
@@ -33,16 +34,22 @@ class LocalStorageAdapter implements StorageAdapter {
   async save({
     eventId,
     templateId,
+    revisionId,
     filename,
     buffer,
   }: {
     eventId?: string;
     templateId?: string;
+    revisionId?: string;
     filename: string;
     buffer: Buffer;
   }): Promise<string> {
-    const ownerType = templateId ? "templates" : "events";
-    const ownerId = templateId ?? eventId;
+    const ownerType = revisionId
+      ? "revisions"
+      : templateId
+        ? "templates"
+        : "events";
+    const ownerId = revisionId ?? templateId ?? eventId;
     if (!ownerId) throw new Error("storage_owner_required");
     const dir = path.join(UPLOAD_ROOT, ownerType, ownerId);
     await mkdir(dir, { recursive: true });

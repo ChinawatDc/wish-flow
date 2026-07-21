@@ -155,9 +155,17 @@ export async function duplicateOwnedEvent(userId: string, eventId: string) {
       templateVersionId: source.templateVersionId,
       templateData: source.templateData ?? {},
       eventDate: source.eventDate,
+      expiresAt: source.expiresAt,
       pinHash,
       status: "draft",
+      duplicatedFromEventId: source.id,
     },
+  });
+
+  const { cloneEventAssets } = await import("@/lib/card-marketplace-service");
+  await cloneEventAssets({
+    sourceEventId: source.id,
+    targetEventId: copy.id,
   });
 
   return { event: copy, pin };

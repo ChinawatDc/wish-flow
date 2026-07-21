@@ -79,19 +79,25 @@ export async function claimDeviceEvents(params: {
 
 export async function listUsersForAdmin(params: {
   q?: string;
+  role?: "USER" | "ADMIN";
+  status?: "ACTIVE" | "SUSPENDED";
   page: number;
   limit: number;
 }) {
-  const where = params.q
-    ? {
-        OR: [
-          { email: { contains: params.q, mode: "insensitive" as const } },
-          { name: { contains: params.q, mode: "insensitive" as const } },
-        ],
-      }
-    : {};
+  const where = {
+    ...(params.role ? { role: params.role } : {}),
+    ...(params.status ? { status: params.status } : {}),
+    ...(params.q
+      ? {
+          OR: [
+            { email: { contains: params.q, mode: "insensitive" as const } },
+            { name: { contains: params.q, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
 
-  const [total, rows] = await Promise.all([
+  const [total, rows, adminTotal, userTotal] = await Promise.all([
     prisma.user.count({ where }),
     prisma.user.findMany({
       where,
@@ -111,6 +117,8 @@ export async function listUsersForAdmin(params: {
         _count: { select: { events: true } },
       },
     }),
+    prisma.user.count({ where: { role: "ADMIN" } }),
+    prisma.user.count({ where: { role: "USER" } }),
   ]);
 
   return {
@@ -118,6 +126,7 @@ export async function listUsersForAdmin(params: {
     page: params.page,
     limit: params.limit,
     totalPages: Math.max(1, Math.ceil(total / params.limit)),
+    roleCounts: { ADMIN: adminTotal, USER: userTotal },
     users: rows.map((u) => ({
       id: u.id,
       email: u.email,
@@ -144,6 +153,15 @@ export async function updateUserAsAdmin(params: {
 
   if (params.role && params.role !== target.role) {
     if (params.targetId === params.actorId && params.role === "USER") {
+      await writeAudit({
+        action: AUDIT_ACTIONS.ADMIN_USER_ROLE_CHANGE,
+        actor: { userId: params.actorId },
+        resourceType: "user",
+        resourceId: target.id,
+        outcome: "DENIED",
+        summaryTh: `ปฏิเสธการลดสิทธิ์ตัวเอง (${target.email})`,
+        metadata: { reason: "cannot_demote_self", targetEmail: target.email },
+      });
       return { error: "cannot_demote_self" as const };
     }
     if (target.role === "ADMIN" && params.role === "USER") {
@@ -151,16 +169,30 @@ export async function updateUserAsAdmin(params: {
         where: { role: "ADMIN", status: "ACTIVE" },
       });
       if (adminCount <= 1) {
+        await writeAudit({
+          action: AUDIT_ACTIONS.ADMIN_USER_ROLE_CHANGE,
+          actor: { userId: params.actorId },
+          resourceType: "user",
+          resourceId: target.id,
+          outcome: "DENIED",
+          summaryTh: `ปฏิเสธการลดสิทธิ์ admin คนสุดท้าย (${target.email})`,
+          metadata: { reason: "last_admin", targetEmail: target.email },
+        });
         return { error: "last_admin" as const };
       }
     }
   }
 
-  if (
-    params.status === "SUSPENDED" &&
-    target.role === "ADMIN" &&
-    params.targetId === params.actorId
-  ) {
+  if (params.status === "SUSPENDED" && params.targetId === params.actorId) {
+    await writeAudit({
+      action: AUDIT_ACTIONS.ADMIN_USER_STATUS_CHANGE,
+      actor: { userId: params.actorId },
+      resourceType: "user",
+      resourceId: target.id,
+      outcome: "DENIED",
+      summaryTh: `ปฏิเสธการระงับบัญชีตัวเอง (${target.email})`,
+      metadata: { reason: "cannot_suspend_self", targetEmail: target.email },
+    });
     return { error: "cannot_suspend_self" as const };
   }
 
@@ -173,6 +205,15 @@ export async function updateUserAsAdmin(params: {
       where: { role: "ADMIN", status: "ACTIVE" },
     });
     if (adminCount <= 1) {
+      await writeAudit({
+        action: AUDIT_ACTIONS.ADMIN_USER_STATUS_CHANGE,
+        actor: { userId: params.actorId },
+        resourceType: "user",
+        resourceId: target.id,
+        outcome: "DENIED",
+        summaryTh: `ปฏิเสธการระงับ admin คนสุดท้าย (${target.email})`,
+        metadata: { reason: "last_admin", targetEmail: target.email },
+      });
       return { error: "last_admin" as const };
     }
   }

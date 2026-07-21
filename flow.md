@@ -100,10 +100,17 @@ admin:
 | POST | `/api/auth/register` | สมัครด้วยอีเมล/รหัสผ่าน |
 | GET/POST | `/api/auth/[...nextauth]` | Auth.js (Credentials + Google) |
 | POST | `/api/auth/claim-device` | claim การ์ด legacy จาก device cookie ครั้งเดียวหลัง login |
-| GET | `/api/admin/users` | Admin: list/search ผู้ใช้ |
-| PATCH | `/api/admin/users/:id` | Admin: suspend/reactivate, เปลี่ยน role (มี last-admin guard) |
+| GET | `/api/admin/users` | Admin: list/search ผู้ใช้ (`role`, `status`, `q`, `page`, `limit` เริ่มต้น 10) |
+| PATCH | `/api/admin/users/:id` | Admin: suspend/reactivate, เปลี่ยน role (กัน demote/suspend ตัวเอง + last-admin) |
 | GET | `/api/admin/events` | Admin: การ์ดทุกบัญชี read-only (ไม่มี pinHash) |
 | GET | `/api/admin/events/:id` | Admin: รายละเอียดการ์ด read-only |
+| POST | `/api/events/:id/share` | เจ้าของ: เผยแพร่ snapshot ไปคลังแชร์ (opt-in รวมรูป) |
+| POST | `/api/events/:id/share/unpublish` | เจ้าของ: เลิกเผยแพร่ (UNLISTED) |
+| GET | `/api/events/:id/share/revisions` | เจ้าของ: ประวัติเวอร์ชันที่เคยแชร์ |
+| GET | `/api/marketplace/cards` | คลังแชร์ (login) — list LISTED |
+| GET | `/api/marketplace/cards/:id` | รายละเอียด + พรีวิว snapshot |
+| POST | `/api/marketplace/cards/:id/heart` | กด/ยกเลิกหัวใจ (unique ต่อ user) |
+| POST | `/api/marketplace/cards/:id/use` | นำไปใช้ → draft ของผู้ใช้ + PIN ใหม่ (นับ unique) |
 | GET/POST | `/api/admin/templates` | Admin: Template Studio list/create draft |
 | GET/PATCH | `/api/admin/templates/:id` | Admin: metadata + draft editing |
 | POST | `/api/admin/templates/:id/validate` | ตรวจ schema/sample/QA gate |

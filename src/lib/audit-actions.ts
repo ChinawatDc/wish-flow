@@ -32,6 +32,9 @@ export const AUDIT_ACTIONS = {
   TEMPLATE_PUBLISH: "TEMPLATE.PUBLISH",
   TEMPLATE_ROLLBACK: "TEMPLATE.ROLLBACK",
   EVENT_DELETE: "EVENT.DELETE",
+  CARD_SHARE_PUBLISH: "CARD.SHARE_PUBLISH",
+  CARD_SHARE_UNPUBLISH: "CARD.SHARE_UNPUBLISH",
+  CARD_MARKETPLACE_USE: "CARD.MARKETPLACE_USE",
 
   // Logs
   ADMIN_LOG_EXPORT: "ADMIN.LOG_EXPORT",
@@ -46,6 +49,7 @@ export const AUDIT_RESOURCE_TYPES = [
   "support_case",
   "conversation",
   "log",
+  "card_listing",
 ] as const;
 
 export type AuditResourceType = (typeof AUDIT_RESOURCE_TYPES)[number];

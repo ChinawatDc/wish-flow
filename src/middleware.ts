@@ -17,10 +17,12 @@ export default auth((req) => {
       pathname.startsWith("/admin") ||
       pathname.startsWith("/profile") ||
       pathname.startsWith("/messages") ||
+      pathname.startsWith("/marketplace") ||
       pathname.startsWith("/support/chat") ||
       pathname.startsWith("/api/events") ||
       pathname.startsWith("/api/admin") ||
       pathname.startsWith("/api/me") ||
+      pathname.startsWith("/api/marketplace") ||
       pathname.startsWith("/api/support/conversations") ||
       pathname.startsWith("/api/auth/claim-device")
     ) {
@@ -41,10 +43,12 @@ export default auth((req) => {
     pathname.startsWith("/admin") ||
     pathname.startsWith("/profile") ||
     pathname.startsWith("/messages") ||
+    pathname.startsWith("/marketplace") ||
     pathname.startsWith("/support/chat") ||
     pathname.startsWith("/api/events") ||
     pathname.startsWith("/api/admin") ||
     pathname.startsWith("/api/me") ||
+    pathname.startsWith("/api/marketplace") ||
     pathname.startsWith("/api/support/conversations");
 
   if (needsAuth && !isLoggedIn) {
@@ -76,6 +80,9 @@ export const config = {
   matcher: [
     "/events/:path*",
     "/admin/:path*",
+    "/admin",
+    "/marketplace/:path*",
+    "/marketplace",
     "/profile/:path*",
     "/profile",
     "/messages/:path*",
@@ -85,6 +92,7 @@ export const config = {
     "/api/events/:path*",
     "/api/admin/:path*",
     "/api/me/:path*",
+    "/api/marketplace/:path*",
     "/api/support/conversations/:path*",
     "/api/support/conversations",
   ],

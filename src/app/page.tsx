@@ -1,6 +1,15 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-export default function HomePage() {
+import { auth } from "@/lib/auth";
+
+export default async function HomePage() {
+  const session = await auth();
+  if (session?.user?.id) {
+    if (session.user.role === "ADMIN") redirect("/admin");
+    redirect("/events");
+  }
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-pink-100 via-rose-50 to-amber-50">
       <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-center px-4 py-12 text-center">

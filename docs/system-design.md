@@ -159,7 +159,8 @@ CREATE TABLE event_assets (
 > - `users` + `accounts` (Auth.js): role `USER`/`ADMIN`, status `ACTIVE`/`SUSPENDED`; `events.owner_user_id` เป็น ownership หลัก ส่วน `creators.device_token` เหลือไว้เพื่อ claim การ์ด legacy ครั้งเดียวหลัง login
 > - `template_versions`: published snapshot immutable (Draft/Published/Deprecated/Archived) + `events.template_version_id` pin — publish version ใหม่ไม่กระทบ event เดิม
 > - `template_assets`, `template_telemetry_events` (guest funnel หลัง unlock, เก็บ device class ไม่เก็บ raw UA/IP)
-> ดู `prisma/schema.prisma` และ `docs/adr.md` ADR-4/ADR-5
+> - **Card Marketplace:** `card_listings` + immutable `card_revisions` (+ assets copies) + `card_hearts` / `card_uses` (unique ต่อ user) — แยกจาก TemplateVersion; ไม่คัดลอก Event PIN
+> ดู `prisma/schema.prisma` และ `docs/adr.md` ADR-4/ADR-5/ADR-7
 
 **ทำไมออกแบบแบบนี้ (เผื่อระบบใหญ่):**
 - `templates.steps_schema` เป็น JSONB → เพิ่ม template ใหม่ = insert row ใหม่ ไม่ต้อง migrate table

@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 
+import { ExpiredCardOverlay } from "@/components/ExpiredCardOverlay";
 import { ImageUploader, type UploadedAsset } from "@/components/ImageUploader";
 import { TemplateExplorer, type TemplateSummary } from "@/components/TemplateExplorer";
 import { ThaiDatePicker } from "@/components/ThaiDatePicker";
@@ -91,19 +92,23 @@ function SectionCard({
 }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   return (
-    <section className="overflow-hidden rounded-3xl border-2 border-rose-100 bg-white shadow-sm">
+    <section className="relative rounded-3xl border-2 border-rose-100 bg-white shadow-sm">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between px-5 py-4 text-left"
+        className="flex w-full items-center justify-between rounded-3xl px-5 py-4 text-left"
       >
         <span className="text-base font-bold text-rose-800">
           {emoji} {title}
         </span>
         <span className={`text-rose-300 transition ${open ? "rotate-180" : ""}`}>▼</span>
       </button>
-      {open && <div className="border-t-2 border-rose-50 px-5 py-4">{children}</div>}
+      {open && (
+        <div className="relative z-20 overflow-visible border-t-2 border-rose-50 px-5 py-4">
+          {children}
+        </div>
+      )}
     </section>
   );
 }
@@ -299,14 +304,14 @@ export default function EditEventPage() {
                   className="mt-1 w-full rounded-2xl border-2 border-rose-100 px-4 py-3 outline-none focus:border-rose-300"
                 />
               </label>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
+              <div className="relative z-30 grid gap-4 sm:grid-cols-2">
+                <div className="relative">
                   <p className="text-sm font-semibold text-rose-800">วันเกิด/วันสำคัญ 🎂</p>
                   <div className="mt-1">
                     <ThaiDatePicker value={eventDate} onChange={setEventDate} />
                   </div>
                 </div>
-                <div>
+                <div className="relative">
                   <p className="text-sm font-semibold text-rose-800">วันหมดอายุการ์ด ⏳</p>
                   <div className="mt-1">
                     <ThaiDatePicker
@@ -506,7 +511,11 @@ export default function EditEventPage() {
                 ✕
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-3 pb-4">
+            <div className="relative flex-1 overflow-y-auto px-3 pb-4">
+              {expiresAt &&
+                new Date(`${expiresAt}T23:59:59.000Z`).getTime() < Date.now() && (
+                  <ExpiredCardOverlay />
+                )}
               <StepRenderer
                 key={`${templateInfo.slug}-${previewOpen}`}
                 steps={templateInfo.stepsSchema.steps}

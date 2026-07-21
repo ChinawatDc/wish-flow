@@ -62,7 +62,7 @@ export function ThaiDatePicker({ value, onChange, placeholder }: Props) {
   const yearOptions = useMemo(() => {
     const current = new Date().getFullYear();
     const years: number[] = [];
-    for (let y = current - 5; y <= current + 5; y++) years.push(y);
+    for (let y = current - 80; y <= current + 5; y++) years.push(y);
     return years;
   }, []);
 
@@ -108,7 +108,7 @@ export function ThaiDatePicker({ value, onChange, placeholder }: Props) {
         <div
           role="dialog"
           aria-label="ปฏิทินเลือกวันที่"
-          className="absolute z-40 mt-2 w-full min-w-[300px] rounded-3xl border-2 border-rose-100 bg-white p-4 shadow-xl"
+          className="absolute left-0 right-0 z-50 mt-2 w-full min-w-[280px] rounded-3xl border-2 border-rose-100 bg-white p-4 shadow-xl sm:min-w-[300px]"
         >
           <div className="mb-3 flex items-center justify-between gap-2">
             <button

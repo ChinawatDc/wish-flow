@@ -12,20 +12,45 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
       include: {
         template: { select: { id: true, slug: true, name: true } },
+        cardListing: {
+          select: {
+            id: true,
+            status: true,
+            heartCount: true,
+            useCount: true,
+            currentRevisionId: true,
+          },
+        },
       },
     });
 
+    const now = Date.now();
     return jsonOk({
-      events: events.map((e) => ({
-        id: e.id,
-        name: e.name,
-        eventDate: e.eventDate?.toISOString().slice(0, 10) ?? null,
-        status: e.status,
-        viewCount: e.viewCount,
-        template: e.template,
-        createdAt: e.createdAt.toISOString(),
-        updatedAt: e.updatedAt.toISOString(),
-      })),
+      events: events.map((e) => {
+        const expired =
+          Boolean(e.expiresAt) && (e.expiresAt as Date).getTime() < now;
+        return {
+          id: e.id,
+          name: e.name,
+          eventDate: e.eventDate?.toISOString().slice(0, 10) ?? null,
+          expiresAt: e.expiresAt?.toISOString().slice(0, 10) ?? null,
+          status: expired ? "expired" : e.status,
+          isExpired: expired,
+          viewCount: e.viewCount,
+          template: e.template,
+          share: e.cardListing
+            ? {
+                listingId: e.cardListing.id,
+                status: e.cardListing.status,
+                heartCount: e.cardListing.heartCount,
+                useCount: e.cardListing.useCount,
+                hasRevisions: Boolean(e.cardListing.currentRevisionId),
+              }
+            : null,
+          createdAt: e.createdAt.toISOString(),
+          updatedAt: e.updatedAt.toISOString(),
+        };
+      }),
     });
   } catch (error) {
     return authErrorResponse(error);

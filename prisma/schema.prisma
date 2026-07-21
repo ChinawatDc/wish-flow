@@ -48,6 +48,11 @@ enum DeviceClass {
   UNKNOWN
 }
 
+enum CardListingStatus {
+  LISTED
+  UNLISTED
+}
+
 enum AuditOutcome {
   SUCCESS
   FAILURE
@@ -135,6 +140,9 @@ model User {
   supportConversations      SupportConversation[] @relation("SupportConversationUser")
   supportMessagesSent       SupportMessage[] @relation("SupportMessageSender")
   notifications             AppNotification[] @relation("NotificationRecipient")
+  cardListings              CardListing[]     @relation("CardListingOwner")
+  cardHearts                CardHeart[]       @relation("CardHeartUser")
+  cardUses                  CardUse[]         @relation("CardUseUser")
 
   @@map("users")
 }
@@ -260,20 +268,32 @@ model Event {
   status            String           @default("active")
   viewCount         Int              @default(0) @map("view_count")
   expiresAt         DateTime?        @map("expires_at")
+  /// Own-card duplicate lineage (ไม่แตะต้นฉบับ)
+  duplicatedFromEventId String?      @map("duplicated_from_event_id") @db.Uuid
+  /// Fork จาก marketplace listing/revision
+  forkedFromListingId   String?      @map("forked_from_listing_id") @db.Uuid
+  forkedFromRevisionId  String?      @map("forked_from_revision_id") @db.Uuid
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
   creator           Creator?         @relation(fields: [creatorId], references: [id], onDelete: SetNull)
   owner             User?            @relation("EventOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
   template          Template?        @relation(fields: [templateId], references: [id], onDelete: SetNull)
   templateVersion   TemplateVersion? @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  duplicatedFrom    Event?           @relation("EventDuplicates", fields: [duplicatedFromEventId], references: [id], onDelete: SetNull)
+  duplicates        Event[]          @relation("EventDuplicates")
+  forkedFromListing CardListing?     @relation("EventForkedFromListing", fields: [forkedFromListingId], references: [id], onDelete: SetNull)
+  forkedFromRevision CardRevision?   @relation("EventForkedFromRevision", fields: [forkedFromRevisionId], references: [id], onDelete: SetNull)
   accessLogs        EventAccessLog[]
   assets            EventAsset[]
   telemetry         TemplateTelemetryEvent[]
+  cardListing       CardListing?     @relation("EventCardListing")
 
   @@index([creatorId])
   @@index([ownerUserId])
   @@index([templateId])
   @@index([templateVersionId])
+  @@index([duplicatedFromEventId])
+  @@index([forkedFromListingId])
   @@map("events")
 }
 
@@ -478,4 +498,98 @@ model AppNotification {
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("app_notifications")
+}
+
+/// Marketplace listing ของการ์ดผู้ใช้ — แยกจาก Template marketplace
+model CardListing {
+  id                  String            @id @default(uuid()) @db.Uuid
+  sourceEventId       String            @unique @map("source_event_id") @db.Uuid
+  ownerUserId         String            @map("owner_user_id") @db.Uuid
+  status              CardListingStatus @default(LISTED)
+  title               String
+  blurb               String?
+  includeAssets       Boolean           @default(false) @map("include_assets")
+  currentRevisionId   String?           @unique @map("current_revision_id") @db.Uuid
+  heartCount          Int               @default(0) @map("heart_count")
+  /// จำนวนผู้ใช้ที่ไม่ซ้ำที่กดนำไปใช้
+  useCount            Int               @default(0) @map("use_count")
+  publishedAt         DateTime?         @map("published_at")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+  sourceEvent         Event             @relation("EventCardListing", fields: [sourceEventId], references: [id], onDelete: Cascade)
+  owner               User              @relation("CardListingOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  currentRevision     CardRevision?     @relation("CardListingCurrentRevision", fields: [currentRevisionId], references: [id], onDelete: SetNull)
+  revisions           CardRevision[]    @relation("CardListingRevisions")
+  hearts              CardHeart[]
+  uses                CardUse[]
+  forkedEvents        Event[]           @relation("EventForkedFromListing")
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([ownerUserId])
+  @@map("card_listings")
+}
+
+/// Immutable published snapshot ของการ์ด (ไม่ใช่ TemplateVersion)
+model CardRevision {
+  id                String   @id @default(uuid()) @db.Uuid
+  listingId         String   @map("listing_id") @db.Uuid
+  version           Int
+  name              String
+  templateId        String?  @map("template_id") @db.Uuid
+  templateVersionId String?  @map("template_version_id") @db.Uuid
+  templateData      Json     @default("{}") @map("template_data")
+  includeAssets     Boolean  @default(false) @map("include_assets")
+  createdAt         DateTime @default(now()) @map("created_at")
+  listing           CardListing @relation("CardListingRevisions", fields: [listingId], references: [id], onDelete: Cascade)
+  currentFor        CardListing? @relation("CardListingCurrentRevision")
+  assets            CardRevisionAsset[]
+  uses              CardUse[]
+  forkedEvents      Event[]  @relation("EventForkedFromRevision")
+
+  @@unique([listingId, version])
+  @@index([listingId, createdAt(sort: Desc)])
+  @@map("card_revisions")
+}
+
+model CardRevisionAsset {
+  id         String   @id @default(uuid()) @db.Uuid
+  revisionId String   @map("revision_id") @db.Uuid
+  assetType  String?  @map("asset_type")
+  url        String
+  mimeType   String?  @map("mime_type")
+  sizeBytes  Int?     @map("size_bytes")
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  revision   CardRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@index([revisionId, sortOrder])
+  @@map("card_revision_assets")
+}
+
+model CardHeart {
+  listingId String   @map("listing_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  listing   CardListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  user      User        @relation("CardHeartUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([listingId, userId])
+  @@index([userId])
+  @@map("card_hearts")
+}
+
+model CardUse {
+  id            String   @id @default(uuid()) @db.Uuid
+  listingId     String   @map("listing_id") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  revisionId    String   @map("revision_id") @db.Uuid
+  forkedEventId String   @unique @map("forked_event_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+  listing       CardListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  user          User        @relation("CardUseUser", fields: [userId], references: [id], onDelete: Cascade)
+  revision      CardRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+
+  @@unique([listingId, userId])
+  @@index([revisionId])
+  @@map("card_uses")
 }

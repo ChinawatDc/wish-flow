@@ -1,9 +1,9 @@
 # Wish-Flow — Goal Ledger
 
-Focus: G7 Support & Account Security (A→E)  
+Focus: G8 Role Dashboard + Card Marketplace  
 Status: **completed**  
 Last Updated: 2026-07-21  
-Sources: `docs/system-design.md`, `flow.md`, `AGENTS.md`, `docs/template-studio-ia.md`
+Sources: `docs/system-design.md`, `flow.md`, `AGENTS.md`, `docs/adr.md` ADR-7
 
 ---
 
@@ -134,6 +134,19 @@ Sources: `docs/system-design.md`, `flow.md`, `AGENTS.md`, `docs/template-studio-
   - Cleanup scripts dry-run ผ่าน (`cleanup-logs`, `cleanup-support-retention`)
   - Security: PIN/password/token เก็บ hash เท่านั้น, audit metadata ผ่าน sanitize (มี test ยืนยันไม่รั่ว), step-up 428 → modal ยืนยัน PIN, self-reset DENIED + audit, ชื่อ admin ไม่หลุดใน payload ฝั่ง user (test ยืนยัน), `Event.pinHash` ไม่ถูกแตะ
 
+### G8: Role Dashboard + Card Marketplace — DONE 2026-07-21
+- [x] Admin Users: แท็บแยก `ADMIN`/`USER` + pagination เริ่มต้น 10 + dropdown 10/20/50; ปิดปุ่มลด role/ระงับตัวเองใน UI; server guard demote/suspend ตัวเอง + last-admin + audit DENIED
+- [x] หน้าแรกตาม role: Guest เห็น marketing `/`; login แล้ว USER → `/events`, ADMIN → `/admin` hub; brand nav ตาม role; `/marketplace` ต้อง login
+- [x] Card Marketplace: `card_listings` / `card_revisions` / assets / hearts / uses; publish snapshot (opt-in รูป); heart + นำไปใช้ (PIN ใหม่, unique count); duplicate clone assets + lineage
+- [x] Expiry hard-gate: verify-pin / view / telemetry + overlay บน list / guest / edit preview; ThaiDatePicker ปีกว้างขึ้นสำหรับวันสำคัญ
+- Spec / ADR: `docs/adr.md` ADR-7
+- **Evidence (2026-07-21):**
+  - Migration: `20260721170000_card_marketplace` applied (local Docker `:5435`)
+  - `npm test` — **104/104 ผ่าน**
+  - `npm run build` — ผ่าน (routes: `/admin`, `/marketplace`, share/marketplace APIs)
+  - Guards: cannot_demote_self / cannot_suspend_self / last_admin + UI disable self actions
+  - Marketplace: snapshot immutable ตอน publish; ไม่คัดลอก pinHash; useCount นับ unique user
+
 ## Deferred
 
 - Google OAuth credentials บน production (ตั้ง `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`)
@@ -179,3 +192,4 @@ Sources: `docs/system-design.md`, `flow.md`, `AGENTS.md`, `docs/template-studio-
 - [x] 2026-07-21 — **Template Studio A→B→C** (immutable versions + event pin, admin library/builder, QA gate, real telemetry analytics, marketplace metadata — 70 tests + build ผ่าน)
 - [x] 2026-07-21 — **G7 Support & Account Security specs** (`docs/support-ops-milestones.md`, milestones A–E รวม System/Audit Log, `docs/AI_SUPPORT_OPS_PROMPT.md`)
 - [x] 2026-07-21 — **G7 Support & Account Security A→E implemented** (Security PIN + step-up + admin reset, `/profile`, public support cases + admin console, chat 1:1 polling, NotificationAdapter + retention scripts, Audit/System Log + `/admin/logs` + export — 100 tests + build ผ่าน)
+- [x] 2026-07-21 — **G8 Role Dashboard + Card Marketplace** (admin users by role + pagination, role home `/admin`, card share snapshots/hearts/use, expiry overlay — 104 tests + build ผ่าน)

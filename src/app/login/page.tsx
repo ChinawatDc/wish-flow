@@ -8,7 +8,11 @@ import { FormEvent, Suspense, useState } from "react";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/events";
+  const rawCallback = searchParams.get("callbackUrl");
+  const safeCallback =
+    rawCallback && rawCallback.startsWith("/") && !rawCallback.startsWith("//")
+      ? rawCallback
+      : null;
   const urlError = searchParams.get("error");
 
   const [email, setEmail] = useState("");
@@ -41,7 +45,8 @@ function LoginForm() {
       return;
     }
     await fetch("/api/auth/claim-device", { method: "POST" }).catch(() => {});
-    router.push(callbackUrl);
+    // ไม่มี callback ปลอดภัย → ให้ `/` แยก home ตาม role
+    router.push(safeCallback ?? "/");
     router.refresh();
   }
 
@@ -90,7 +95,7 @@ function LoginForm() {
 
         <button
           type="button"
-          onClick={() => signIn("google", { callbackUrl })}
+          onClick={() => signIn("google", { callbackUrl: safeCallback ?? "/" })}
           className="mt-3 w-full rounded-2xl border-2 border-rose-200 bg-white py-3 text-sm font-semibold text-rose-700 hover:bg-rose-50"
         >
           เข้าด้วย Google

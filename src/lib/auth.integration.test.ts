@@ -9,6 +9,7 @@ import {
 } from "@/lib/asset-service";
 import {
   claimDeviceEvents,
+  listUsersForAdmin,
   registerUser,
   updateUserAsAdmin,
 } from "@/lib/auth-service";
@@ -226,5 +227,122 @@ describe.runIf(hasDb)("auth-service: register, claim, admin guards", () => {
       role: "USER",
     });
     expect(last).toEqual({ error: "cannot_demote_self" });
+  });
+
+  it("admin ไม่ระงับตัวเอง และกัน last-admin", async () => {
+    const solo = await makeUser("solo-suspend", "ADMIN");
+    ids.push(solo.id);
+
+    const selfSuspend = await updateUserAsAdmin({
+      actorId: solo.id,
+      targetId: solo.id,
+      status: "SUSPENDED",
+    });
+    expect(selfSuspend).toEqual({ error: "cannot_suspend_self" });
+
+    const peer = await makeUser("peer-admin", "ADMIN");
+    ids.push(peer.id);
+
+    const demoteOk = await updateUserAsAdmin({
+      actorId: peer.id,
+      targetId: solo.id,
+      role: "USER",
+    });
+    expect("user" in demoteOk).toBe(true);
+
+    const lastSuspendSelf = await updateUserAsAdmin({
+      actorId: peer.id,
+      targetId: peer.id,
+      status: "SUSPENDED",
+    });
+    expect(lastSuspendSelf).toEqual({ error: "cannot_suspend_self" });
+
+    const lastDemoteSelf = await updateUserAsAdmin({
+      actorId: peer.id,
+      targetId: peer.id,
+      role: "USER",
+    });
+    expect(lastDemoteSelf).toEqual({ error: "cannot_demote_self" });
+
+    // แยกสถานการณ์ last-admin: เหลือ ACTIVE ADMIN แค่คนเดียวใน DB
+    const only = await makeUser("only-admin-left", "ADMIN");
+    ids.push(only.id);
+    const others = await prisma.user.findMany({
+      where: { role: "ADMIN", status: "ACTIVE", id: { not: only.id } },
+      select: { id: true },
+    });
+    const otherIds = others.map((u) => u.id);
+    if (otherIds.length > 0) {
+      await prisma.user.updateMany({
+        where: { id: { in: otherIds } },
+        data: { status: "SUSPENDED" },
+      });
+    }
+
+    try {
+      const blockSuspendSelfOnly = await updateUserAsAdmin({
+        actorId: only.id,
+        targetId: only.id,
+        status: "SUSPENDED",
+      });
+      expect(blockSuspendSelfOnly).toEqual({ error: "cannot_suspend_self" });
+
+      const actor = await makeUser("actor-for-last", "USER");
+      ids.push(actor.id);
+      await prisma.user.update({
+        where: { id: actor.id },
+        data: { role: "ADMIN", status: "ACTIVE" },
+      });
+      await prisma.user.update({
+        where: { id: actor.id },
+        data: { status: "SUSPENDED" },
+      });
+
+      const blockByOther = await updateUserAsAdmin({
+        actorId: actor.id,
+        targetId: only.id,
+        status: "SUSPENDED",
+      });
+      expect(blockByOther).toEqual({ error: "last_admin" });
+
+      const blockDemoteLast = await updateUserAsAdmin({
+        actorId: actor.id,
+        targetId: only.id,
+        role: "USER",
+      });
+      expect(blockDemoteLast).toEqual({ error: "last_admin" });
+    } finally {
+      if (otherIds.length > 0) {
+        await prisma.user.updateMany({
+          where: { id: { in: otherIds } },
+          data: { status: "ACTIVE" },
+        });
+      }
+    }
+  });
+
+  it("list users กรอง role + pagination", async () => {
+    const admin = await makeUser("list-admin", "ADMIN");
+    const u1 = await makeUser("list-user-a");
+    const u2 = await makeUser("list-user-b");
+    ids.push(admin.id, u1.id, u2.id);
+
+    const admins = await listUsersForAdmin({
+      role: "ADMIN",
+      page: 1,
+      limit: 10,
+    });
+    expect(admins.users.every((u) => u.role === "ADMIN")).toBe(true);
+    expect(admins.roleCounts.ADMIN).toBeGreaterThanOrEqual(1);
+
+    const usersPage = await listUsersForAdmin({
+      role: "USER",
+      page: 1,
+      limit: 1,
+    });
+    expect(usersPage.limit).toBe(1);
+    expect(usersPage.users).toHaveLength(1);
+    expect(usersPage.users[0]?.role).toBe("USER");
+    expect(usersPage.totalPages).toBeGreaterThanOrEqual(1);
   });
 });

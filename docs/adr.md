@@ -107,3 +107,15 @@ tar xzf uploads-backup-YYYYMMDD.tar.gz
 13. hash chain (`prevHash`/`entryHash`) ของ audit — **เลื่อน** รอบนี้เพื่อความเรียบง่าย (ตารางออกแบบให้เพิ่มคอลัมน์ได้ภายหลัง)
 
 **เหตุผล:** แยก concern ของ log ให้ query/retention ต่างกันได้, ลดความเสี่ยง secret รั่วผ่าน log, และให้ session revoke ทำงานได้จริงบน JWT (ADR-4) ผ่าน authVersion
+
+## ADR-7: Card Marketplace = immutable share revisions (แยกจาก TemplateVersion)
+
+**ตัดสินใจ:**
+1. การแชร์การ์ดของผู้ใช้สร้าง `CardListing` + immutable `CardRevision` ตอนกดเผยแพร่เท่านั้น — แก้ live `Event` ไม่กระทบ snapshot จนกดเผยแพร่ใหม่
+2. แยกจาก `TemplateVersion` เด็ดขาด — revision เก็บ `templateVersionId` pin + sanitized `templateData` + asset copies (ถ้า opt-in)
+3. ห้ามคัดลอก `pinHash` / unlock token / Security PIN ไป listing
+4. Heart / Use นับ unique ต่อ `(listingId, userId)` — นำไปใช้สร้าง event draft ใหม่ + PIN ใหม่ + copy assets ผ่าน `StorageAdapter`
+5. Duplicate ของตัวเอง clone รูปจริง + ตั้ง `duplicatedFromEventId` โดยไม่แก้ต้นฉบับ
+6. Guest expiry เป็น hard gate บน verify-pin / view / telemetry + UI overlay
+
+**เหตุผล:** ลดการรั่วรูปส่วนตัวโดยไม่ตั้งใจ, คงประวัติเวอร์ชันที่คนอื่นดาวน์โหลด, และไม่ผสม ownership กับการ์ด PIN ของเจ้าของ

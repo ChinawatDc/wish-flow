@@ -39,7 +39,8 @@ Phase 1 MVP ตาม `goal.md` G1: create → PIN/QR → guest unlock → templ
 - Event id เป็น UUID ไม่ใช่ auto-increment
 - Template ต้องผ่าน `steps_schema` + `StepRenderer` — ห้าม hardcode field HBD ในหน้า guest
 - Published `template_versions` immutable — publish ใหม่ห้ามขยับ `events.template_version_id` ของ event เดิม (ADR-5)
-- Schema ตรง `docs/system-design.md` §5 + ส่วนอัปเดต (users, accounts, template_versions, template_assets, template_telemetry_events)
+- Card Marketplace แยกจาก TemplateVersion — แชร์เป็น `card_revisions` immutable ตอน publish; ห้ามคัดลอก Event PIN; heart/use นับ unique ต่อ user (ADR-7)
+- Schema ตรง `docs/system-design.md` §5 + ส่วนอัปเดต (users, accounts, template_versions, template_assets, template_telemetry_events, card_listings)
 - API อย่างน้อยครบ `flow.md` §5 / design §7
 - UI mobile-first: ใช้งานได้บนมือถือ, แท็บเล็ต, เดสก์ท็อป
 - เปลี่ยน schema ผ่าน Prisma migrate เท่านั้น

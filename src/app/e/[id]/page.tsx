@@ -3,6 +3,8 @@
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { ExpiredCardOverlay } from "@/components/ExpiredCardOverlay";
+
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "del"] as const;
 
 export default function GuestPinPage() {
@@ -12,6 +14,7 @@ export default function GuestPinPage() {
 
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [expired, setExpired] = useState(false);
   const [loading, setLoading] = useState(false);
   const [wobble, setWobble] = useState(false);
   const [pressed, setPressed] = useState<string | null>(null);
@@ -27,6 +30,12 @@ export default function GuestPinPage() {
           body: JSON.stringify({ pin: fullPin }),
         });
         const data = await res.json();
+        if (res.status === 410) {
+          setExpired(true);
+          setError(data.error || "อีเวนต์นี้หมดอายุแล้ว");
+          setPin("");
+          return;
+        }
         if (res.status === 429) {
           setError(`ลองหลายครั้งเกินไป รออีก ${data.retryAfterSeconds ?? "สักครู่"} วินาทีนะ 🥺`);
           setPin("");
@@ -81,7 +90,8 @@ export default function GuestPinPage() {
   }, [press]);
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-pink-100 via-rose-50 to-amber-50">
+    <main className="relative min-h-screen bg-gradient-to-b from-pink-100 via-rose-50 to-amber-50">
+      {expired && <ExpiredCardOverlay />}
       <div className="mx-auto flex min-h-screen w-full max-w-sm flex-col items-center justify-center px-4 py-8">
         <div className="animate-float text-6xl">💝</div>
         <h1 className="mt-4 text-2xl font-bold text-rose-600 sm:text-3xl">มีของขวัญรอคุณอยู่!</h1>

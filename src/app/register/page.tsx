@@ -34,7 +34,7 @@ export default function RegisterPage() {
       if (login?.error) throw new Error("สมัครสำเร็จ แต่เข้าสู่ระบบไม่สำเร็จ");
 
       await fetch("/api/auth/claim-device", { method: "POST" }).catch(() => {});
-      router.push("/events");
+      router.push("/");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "สมัครไม่สำเร็จ");

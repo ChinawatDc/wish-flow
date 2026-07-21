@@ -15,25 +15,30 @@ type UserRow = {
   createdAt: string;
 };
 
+type RoleTab = "ADMIN" | "USER";
 type PendingReset = { userId: string; kind: "password" | "pin" };
+
+const PAGE_SIZES = [10, 20, 50] as const;
 
 export default function AdminUsersPage() {
   const { data: session } = useSession();
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [roleTab, setRoleTab] = useState<RoleTab>("USER");
+  const [roleCounts, setRoleCounts] = useState({ ADMIN: 0, USER: 0 });
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState<(typeof PAGE_SIZES)[number]>(10);
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // step-up modal
   const [pending, setPending] = useState<PendingReset | null>(null);
   const [needStepUp, setNeedStepUp] = useState(false);
   const [pin, setPin] = useState("");
   const [stepUpError, setStepUpError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
 
-  // แสดงค่าชั่วคราวครั้งเดียว
   const [tempCredential, setTempCredential] = useState<{
     label: string;
     value: string;
@@ -43,7 +48,11 @@ export default function AdminUsersPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const params = new URLSearchParams({ page: String(page), limit: "20" });
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+      role: roleTab,
+    });
     if (q) params.set("q", q);
     const res = await fetch(`/api/admin/users?${params}`);
     const data = await res.json();
@@ -54,8 +63,10 @@ export default function AdminUsersPage() {
     }
     setUsers(data.users);
     setTotalPages(data.totalPages);
+    setTotal(data.total);
+    if (data.roleCounts) setRoleCounts(data.roleCounts);
     setLoading(false);
-  }, [page, q]);
+  }, [page, q, limit, roleTab]);
 
   useEffect(() => {
     void load();
@@ -89,7 +100,6 @@ export default function AdminUsersPage() {
       });
       const data = await res.json();
       if (res.status === 428) {
-        // ต้อง step-up ก่อน
         setPending(reset);
         setNeedStepUp(true);
         return;
@@ -141,14 +151,35 @@ export default function AdminUsersPage() {
             <h1 className="text-2xl font-bold text-violet-800">จัดการผู้ใช้ 👥</h1>
           </div>
           <Link
-            href="/admin/events"
+            href="/admin"
             className="rounded-full border-2 border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-600"
           >
-            ดูการ์ดทั้งหมด →
+            ← แดชบอร์ด
           </Link>
         </div>
 
-        <div className="mb-4 flex gap-2">
+        <div className="mb-4 flex flex-wrap gap-2">
+          {(["USER", "ADMIN"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => {
+                setRoleTab(tab);
+                setPage(1);
+              }}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                roleTab === tab
+                  ? "bg-violet-500 text-white shadow"
+                  : "border-2 border-violet-200 bg-white text-violet-600 hover:bg-violet-50"
+              }`}
+            >
+              {tab === "ADMIN" ? "👑 ADMIN" : "USER"} (
+              {tab === "ADMIN" ? roleCounts.ADMIN : roleCounts.USER})
+            </button>
+          ))}
+        </div>
+
+        <div className="mb-4 flex flex-wrap gap-2">
           <input
             value={q}
             onChange={(e) => {
@@ -156,8 +187,26 @@ export default function AdminUsersPage() {
               setQ(e.target.value);
             }}
             placeholder="ค้นหาอีเมลหรือชื่อ…"
-            className="flex-1 rounded-2xl border-2 border-violet-100 bg-white px-4 py-2.5 text-sm outline-none focus:border-violet-300"
+            className="min-w-[200px] flex-1 rounded-2xl border-2 border-violet-100 bg-white px-4 py-2.5 text-sm outline-none focus:border-violet-300"
           />
+          <label className="flex items-center gap-2 rounded-2xl border-2 border-violet-100 bg-white px-3 py-2 text-sm text-violet-600">
+            แสดง
+            <select
+              value={limit}
+              onChange={(e) => {
+                setLimit(Number(e.target.value) as (typeof PAGE_SIZES)[number]);
+                setPage(1);
+              }}
+              className="rounded-xl border border-violet-200 bg-violet-50 px-2 py-1 font-semibold outline-none"
+            >
+              {PAGE_SIZES.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+            / หน้า
+          </label>
         </div>
 
         {error && (
@@ -168,6 +217,10 @@ export default function AdminUsersPage() {
 
         {loading ? (
           <p className="text-center text-violet-300">กำลังโหลด…</p>
+        ) : users.length === 0 ? (
+          <p className="rounded-3xl border-2 border-dashed border-violet-200 bg-white p-8 text-center text-violet-400">
+            ไม่พบผู้ใช้ในกลุ่มนี้
+          </p>
         ) : (
           <ul className="space-y-3">
             {users.map((u) => {
@@ -184,6 +237,11 @@ export default function AdminUsersPage() {
                         <span className="text-sm font-normal text-violet-400">
                           {u.email}
                         </span>
+                        {isSelf && (
+                          <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-600">
+                            คุณ
+                          </span>
+                        )}
                       </p>
                       <p className="mt-1 text-xs text-violet-400">
                         {u.role === "ADMIN" ? "👑 ADMIN" : "USER"} ·{" "}
@@ -195,23 +253,35 @@ export default function AdminUsersPage() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
+                        disabled={isSelf && u.role === "ADMIN"}
+                        title={
+                          isSelf && u.role === "ADMIN"
+                            ? "ห้ามลดสิทธิ์ตัวเอง"
+                            : undefined
+                        }
                         onClick={() =>
                           patchUser(u.id, {
                             role: u.role === "ADMIN" ? "USER" : "ADMIN",
                           })
                         }
-                        className="rounded-xl border-2 border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-50"
+                        className="rounded-xl border-2 border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         {u.role === "ADMIN" ? "ลดเป็น USER" : "ตั้งเป็น ADMIN"}
                       </button>
                       <button
                         type="button"
+                        disabled={isSelf && u.status === "ACTIVE"}
+                        title={
+                          isSelf && u.status === "ACTIVE"
+                            ? "ห้ามระงับตัวเอง"
+                            : undefined
+                        }
                         onClick={() =>
                           patchUser(u.id, {
                             status: u.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE",
                           })
                         }
-                        className={`rounded-xl border-2 px-3 py-2 text-xs font-semibold ${
+                        className={`rounded-xl border-2 px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
                           u.status === "ACTIVE"
                             ? "border-red-200 text-red-500 hover:bg-red-50"
                             : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"
@@ -245,32 +315,29 @@ export default function AdminUsersPage() {
           </ul>
         )}
 
-        {totalPages > 1 && (
-          <div className="mt-4 flex justify-center gap-2">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="rounded-full border px-4 py-2 text-sm disabled:opacity-40"
-            >
-              ก่อนหน้า
-            </button>
-            <span className="py-2 text-sm text-violet-400">
-              {page}/{totalPages}
-            </span>
-            <button
-              type="button"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="rounded-full border px-4 py-2 text-sm disabled:opacity-40"
-            >
-              ถัดไป
-            </button>
-          </div>
-        )}
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+            className="rounded-full border px-4 py-2 text-sm disabled:opacity-40"
+          >
+            ก่อนหน้า
+          </button>
+          <span className="py-2 text-sm text-violet-400">
+            หน้า {page}/{totalPages} · ทั้งหมด {total} คน
+          </span>
+          <button
+            type="button"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+            className="rounded-full border px-4 py-2 text-sm disabled:opacity-40"
+          >
+            ถัดไป
+          </button>
+        </div>
       </div>
 
-      {/* Step-up PIN modal */}
       {needStepUp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded-3xl border-2 border-violet-200 bg-white p-6 shadow-xl">
@@ -322,7 +389,6 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* Temp credential one-time modal */}
       {tempCredential && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded-3xl border-2 border-amber-200 bg-white p-6 shadow-xl">

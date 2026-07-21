@@ -21,10 +21,13 @@ export async function recordTelemetry(params: {
 }) {
   const event = await prisma.event.findUnique({
     where: { id: params.eventId },
-    select: { id: true, templateVersionId: true, status: true },
+    select: { id: true, templateVersionId: true, status: true, expiresAt: true },
   });
   if (!event || event.status !== "active" || !event.templateVersionId) {
     return { error: "unavailable" as const };
+  }
+  if (event.expiresAt && event.expiresAt.getTime() < Date.now()) {
+    return { error: "expired" as const };
   }
 
   await prisma.templateTelemetryEvent.create({
