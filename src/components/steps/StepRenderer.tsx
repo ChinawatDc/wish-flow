@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
 
+import { KNOWN_STEP_TYPES as REGISTRY_TYPES } from "@/lib/step-registry";
 import type { StepDef } from "@/lib/validation";
 
 import {
@@ -38,7 +39,6 @@ import {
  * เพิ่ม template ใหม่ = ผสม type เดิมใน steps_schema ไม่ต้องแก้โค้ด
  */
 const STEP_REGISTRY: Record<string, ComponentType<StepComponentProps>> = {
-  // ข้อความ/เอฟเฟกต์
   "gift-box": GiftBoxStep,
   "text-reveal": TextRevealStep,
   "typewriter-message": TypewriterStep,
@@ -46,7 +46,6 @@ const STEP_REGISTRY: Record<string, ComponentType<StepComponentProps>> = {
   countdown: CountdownStep,
   "candle-blow": CandleBlowStep,
   "final-celebration": FinalCelebrationStep,
-  // รูปภาพ
   "photo-reveal": PhotoRevealStep,
   "photo-polaroid": PolaroidStep,
   "photo-slideshow": SlideshowStep,
@@ -54,7 +53,6 @@ const STEP_REGISTRY: Record<string, ComponentType<StepComponentProps>> = {
   "memory-timeline": TimelineStep,
   "scratch-card": ScratchCardStep,
   "puzzle-photo": PuzzlePhotoStep,
-  // มินิเกม
   "tap-the-balloon": TapBalloonStep,
   "catch-the-heart": CatchHeartStep,
   "memory-match": MemoryMatchStep,
@@ -64,7 +62,7 @@ const STEP_REGISTRY: Record<string, ComponentType<StepComponentProps>> = {
   "confetti-pop": ConfettiPopStep,
 };
 
-export const KNOWN_STEP_TYPES = Object.keys(STEP_REGISTRY);
+export const KNOWN_STEP_TYPES = REGISTRY_TYPES;
 
 function UnknownStep({ type, onNext }: { type: string; onNext: () => void }) {
   return (
@@ -85,14 +83,39 @@ type Props = {
   steps: StepDef[];
   data: Record<string, unknown>;
   assets?: StepAsset[];
+  initialIndex?: number;
+  onStepChange?: (index: number, step: StepDef | undefined) => void;
+  onComplete?: () => void;
 };
 
-export function StepRenderer({ steps, data, assets = [] }: Props) {
-  const [index, setIndex] = useState(0);
-  const step = steps[index];
+export function StepRenderer({
+  steps,
+  data,
+  assets = [],
+  initialIndex = 0,
+  onStepChange,
+  onComplete,
+}: Props) {
+  const enabled = useMemo(
+    () => steps.filter((s) => s.enabled !== false),
+    [steps],
+  );
+  const [index, setIndex] = useState(() =>
+    Math.min(Math.max(initialIndex, 0), Math.max(enabled.length - 1, 0)),
+  );
+
+  useEffect(() => {
+    setIndex(Math.min(Math.max(initialIndex, 0), Math.max(enabled.length - 1, 0)));
+  }, [initialIndex, enabled.length]);
+
+  useEffect(() => {
+    onStepChange?.(index, enabled[index]);
+  }, [index, enabled, onStepChange]);
+
+  const step = enabled[index];
   const progress = useMemo(
-    () => ((index + 1) / Math.max(steps.length, 1)) * 100,
-    [index, steps.length],
+    () => ((index + 1) / Math.max(enabled.length, 1)) * 100,
+    [index, enabled.length],
   );
 
   if (!step) {
@@ -106,8 +129,14 @@ export function StepRenderer({ steps, data, assets = [] }: Props) {
     );
   }
 
-  const next = () => setIndex((i) => i + 1);
-  const isLast = index >= steps.length - 1;
+  const next = () => {
+    setIndex((i) => {
+      const n = i + 1;
+      if (n >= enabled.length) onComplete?.();
+      return n;
+    });
+  };
+  const isLast = index >= enabled.length - 1;
   const Component = STEP_REGISTRY[step.type];
 
   return (
@@ -119,7 +148,7 @@ export function StepRenderer({ steps, data, assets = [] }: Props) {
         />
       </div>
       <p className="mb-4 text-center text-xs text-rose-300">
-        {index + 1} / {steps.length}
+        {index + 1} / {enabled.length}
       </p>
       {Component ? (
         <Component

@@ -6,51 +6,49 @@ import { hashPin, verifyPin } from "@/lib/pin";
 import { checkPinRateLimit, logPinAttempt } from "@/lib/rate-limit";
 import { issueUnlockToken } from "@/lib/unlock-token";
 
-export async function ensureCreator(deviceToken: string) {
-  return prisma.creator.upsert({
-    where: { deviceToken },
-    update: {},
-    create: { deviceToken },
-  });
-}
-
 export async function createEvent(params: {
-  deviceToken: string;
+  userId: string;
   name: string;
   pin?: string;
 }) {
-  const creator = await ensureCreator(params.deviceToken);
   const pin = params.pin ?? generateSixDigitPin();
   const pinHash = await hashPin(pin);
 
   const defaultTemplate = await prisma.template.findFirst({
     where: { isActive: true, slug: "hbd-classic" },
+    include: { currentPublishedVersion: true },
   });
 
   const event = await prisma.event.create({
     data: {
       name: params.name,
-      creatorId: creator.id,
+      ownerUserId: params.userId,
+      claimedAt: new Date(),
       pinHash,
       templateId: defaultTemplate?.id,
+      templateVersionId: defaultTemplate?.currentPublishedVersionId ?? null,
       templateData: {},
     },
   });
 
-  return { event, pin, creator };
+  return { event, pin };
 }
 
-export async function listEventsForDevice(deviceToken: string) {
-  const creator = await prisma.creator.findUnique({ where: { deviceToken } });
-  if (!creator) return [];
+export async function listEventsForUser(userId: string) {
   return prisma.event.findMany({
-    where: { creatorId: creator.id },
+    where: { ownerUserId: userId },
     orderBy: { createdAt: "desc" },
   });
 }
 
+async function findOwnedByUser(userId: string, eventId: string) {
+  return prisma.event.findFirst({
+    where: { id: eventId, ownerUserId: userId },
+  });
+}
+
 export async function updateOwnedEvent(params: {
-  deviceToken: string;
+  userId: string;
   eventId: string;
   data: {
     name?: string;
@@ -61,22 +59,34 @@ export async function updateOwnedEvent(params: {
     templateData?: Record<string, unknown>;
   };
 }) {
-  const creator = await prisma.creator.findUnique({ where: { deviceToken: params.deviceToken } });
-  if (!creator) return { error: "unauthorized" as const };
-
-  const existing = await prisma.event.findFirst({
-    where: { id: params.eventId, creatorId: creator.id },
-  });
+  const existing = await findOwnedByUser(params.userId, params.eventId);
   if (!existing) return { error: "not_found" as const };
 
   const { templateId, templateData, ...data } = params.data;
 
-  // นับสถิติการใช้เทมเพลตเมื่อเปลี่ยนเป็นอันใหม่
-  if (templateId && templateId !== existing.templateId) {
-    await prisma.template.update({
-      where: { id: templateId },
-      data: { usageCount: { increment: 1 } },
-    });
+  let templateVersionId: string | null | undefined;
+  if (templateId !== undefined) {
+    if (templateId === null) {
+      templateVersionId = null;
+    } else {
+      const template = await prisma.template.findFirst({
+        where: {
+          id: templateId,
+          isActive: true,
+          currentPublishedVersionId: { not: null },
+        },
+      });
+      if (!template?.currentPublishedVersionId) {
+        return { error: "template_unavailable" as const };
+      }
+      templateVersionId = template.currentPublishedVersionId;
+      if (templateId !== existing.templateId) {
+        await prisma.template.update({
+          where: { id: templateId },
+          data: { usageCount: { increment: 1 } },
+        });
+      }
+    }
   }
 
   const event = await prisma.event.update({
@@ -94,18 +104,21 @@ export async function updateOwnedEvent(params: {
                 : { connect: { id: templateId } },
           }
         : {}),
+      ...(templateVersionId !== undefined
+        ? {
+            templateVersion:
+              templateVersionId === null
+                ? { disconnect: true }
+                : { connect: { id: templateVersionId } },
+          }
+        : {}),
     },
   });
   return { event };
 }
 
-export async function deleteOwnedEvent(deviceToken: string, eventId: string) {
-  const creator = await prisma.creator.findUnique({ where: { deviceToken } });
-  if (!creator) return { error: "unauthorized" as const };
-
-  const existing = await prisma.event.findFirst({
-    where: { id: eventId, creatorId: creator.id },
-  });
+export async function deleteOwnedEvent(userId: string, eventId: string) {
+  const existing = await findOwnedByUser(userId, eventId);
   if (!existing) return { error: "not_found" as const };
 
   await prisma.event.delete({ where: { id: eventId } });
@@ -113,22 +126,41 @@ export async function deleteOwnedEvent(deviceToken: string, eventId: string) {
 }
 
 export async function regenerateOwnedPin(
-  deviceToken: string,
+  userId: string,
   eventId: string,
   customPin?: string,
 ) {
-  const creator = await prisma.creator.findUnique({ where: { deviceToken } });
-  if (!creator) return { error: "unauthorized" as const };
-
-  const existing = await prisma.event.findFirst({
-    where: { id: eventId, creatorId: creator.id },
-  });
+  const existing = await findOwnedByUser(userId, eventId);
   if (!existing) return { error: "not_found" as const };
 
   const pin = customPin ?? generateSixDigitPin();
   const pinHash = await hashPin(pin);
   await prisma.event.update({ where: { id: eventId }, data: { pinHash } });
   return { pin };
+}
+
+export async function duplicateOwnedEvent(userId: string, eventId: string) {
+  const source = await findOwnedByUser(userId, eventId);
+  if (!source) return { error: "not_found" as const };
+
+  const pin = generateSixDigitPin();
+  const pinHash = await hashPin(pin);
+
+  const copy = await prisma.event.create({
+    data: {
+      name: `${source.name} (สำเนา)`,
+      ownerUserId: userId,
+      claimedAt: new Date(),
+      templateId: source.templateId,
+      templateVersionId: source.templateVersionId,
+      templateData: source.templateData ?? {},
+      eventDate: source.eventDate,
+      pinHash,
+      status: "draft",
+    },
+  });
+
+  return { event: copy, pin };
 }
 
 export type VerifyPinResult =

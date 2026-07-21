@@ -8,3 +8,23 @@ export const UNLOCK_TTL_SECONDS = 30 * 60; // 30 minutes
 export function unlockCookieName(eventId: string) {
   return `${UNLOCK_COOKIE_PREFIX}${eventId}`;
 }
+
+// ---- G7: Account security (Security PIN ของบัญชี — คนละอย่างกับ Event PIN) ----
+export const STEP_UP_COOKIE = "wf_admin_step_up";
+export const STEP_UP_TTL_SECONDS = 5 * 60; // 5 minutes
+export const SECURITY_PIN_LENGTH = 6;
+export const SECURITY_PIN_MAX_ATTEMPTS = 5;
+export const SECURITY_PIN_LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+// ---- G7: Support ----
+export const SUPPORT_DEVICE_COOKIE = "wf_support_device";
+export const SUPPORT_CONTACT_RATE_LIMIT = 5; // cases per window per ip/device
+export const SUPPORT_CONTACT_RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+export const SUPPORT_MESSAGE_MAX_LENGTH = 4000;
+export const CHAT_POLL_INTERVAL_MS = 4000;
+
+// ---- G7: Log retention (days) ----
+export const AUDIT_LOG_RETENTION_DAYS = 365;
+export const SYSTEM_LOG_ERROR_RETENTION_DAYS = 180;
+export const SYSTEM_LOG_INFO_RETENTION_DAYS = 30;
+export const SUPPORT_PRIVACY_RETENTION_DAYS = 30; // ล้าง ipHash/userAgentDigest หลังปิดเคส

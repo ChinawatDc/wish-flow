@@ -2,44 +2,48 @@
 
 Micro-site builder สำหรับอีเวนต์อวยพร (เริ่มจาก HBD) — สร้างง่าย, แชร์ด้วย QR/ลิงก์, ปลดล็อกด้วย PIN
 
-**Status:** Phase 2 enhancement complete — ปฏิทิน พ.ศ., อัปโหลดรูป, Template Explorer, 21 step types, 13 templates
+**Status:** Auth + RBAC (Admin / User / Guest) — การ์ดแยกตามบัญชีผู้ใช้
 
 ## Docs
 1. [AGENTS.md](AGENTS.md)
 2. [goal.md](goal.md)
 3. [flow.md](flow.md)
 4. [docs/system-design.md](docs/system-design.md)
-5. [docs/adr.md](docs/adr.md) — architecture decisions + backup/restore
+5. [docs/adr.md](docs/adr.md) — architecture decisions + backup/restore + Auth
 6. [docs/AI_BOOTSTRAP_PROMPT.md](docs/AI_BOOTSTRAP_PROMPT.md)
+7. [docs/support-ops-milestones.md](docs/support-ops-milestones.md) — Account Security / Support / Chat / Logs (A→E)
+8. [docs/AI_SUPPORT_OPS_PROMPT.md](docs/AI_SUPPORT_OPS_PROMPT.md) — คำสั่ง AI ทำทุก Milestone จนจบ
 
 ## Quick Start
 
 ```bash
-npm run db:up
-cp .env.example .env   # ครั้งแรก
+cp .env.example .env   # ใส่ DATABASE_URL, DIRECT_URL, AUTH_SECRET, ADMIN_EMAIL/PASSWORD
 npm install
 npx prisma migrate deploy
-npm run db:seed
+npm run db:seed        # templates + bootstrap admin
 npm run dev
 # http://localhost:3000
 ```
 
-## Test
+## Roles
 
-```bash
-npm test          # unit + Postgres integration (ต้อง db:up ก่อน)
-npm run build
-```
+| Role | สิทธิ์ |
+|------|--------|
+| **User** | สมัคร/ล็อกอิน, CRUD การ์ดของตัวเอง |
+| **Admin** | CRUD การ์ดของตัวเอง + ดูการ์ดทุกใบ (read-only) + จัดการผู้ใช้ (ระงับ/เปลี่ยน role) |
+| **Guest** | เปิดลิงก์/QR → กรอก PIN → ดูการ์ด (ไม่ใช่บัญชี) |
 
 ## Main routes
 
 | Path | หน้าที่ |
 |------|---------|
-| `/` | Landing |
-| `/events` | List / สร้าง / สำเนา event + QR |
-| `/events/[id]/edit` | แก้ไข 4 ส่วน (ข้อมูล + รูป + เทมเพลต + เนื้อหา) autosave + preview |
-| `/e/[id]` | Guest กรอก PIN (numpad) |
-| `/e/[id]/view` | เล่น StepRenderer (21 step types) |
+| `/login` `/register` | เข้าสู่ระบบ / สมัคร (อีเมลหรือ Google) |
+| `/events` | การ์ดของฉัน (ต้อง login) |
+| `/events/[id]/edit` | แก้ไขการ์ดตัวเอง |
+| `/admin/users` | จัดการผู้ใช้ (Admin) |
+| `/admin/events` | ดูการ์ดทั้งหมดแบบอ่านอย่างเดียว (Admin) |
+| `/e/[id]` | Guest กรอก PIN |
+| `/e/[id]/view` | เล่น StepRenderer |
 
 ## Features หลัก
 

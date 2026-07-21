@@ -1,9 +1,9 @@
 # Wish-Flow — Goal Ledger
 
-Focus: G1 + Phase 2 Enhancement  
+Focus: G7 Support & Account Security (A→E)  
 Status: **completed**  
 Last Updated: 2026-07-21  
-Sources: `docs/system-design.md`, `flow.md`, `AGENTS.md`
+Sources: `docs/system-design.md`, `flow.md`, `AGENTS.md`, `docs/template-studio-ia.md`
 
 ---
 
@@ -87,10 +87,61 @@ Sources: `docs/system-design.md`, `flow.md`, `AGENTS.md`
   - guest verify-pin ถูก → view คืน template + assets, PIN ผิด → 401 ข้อความไทย
   - หน้า `/`, `/events`, `/e/[id]` = 200
 
+### G5: Auth + RBAC — DONE 2026-07-21
+- [x] Auth.js (email/password + Google optional), JWT session
+- [x] Roles: USER / ADMIN / Guest(PIN)
+- [x] Event ownership = `ownerUserId`; claim legacy device cards once on login
+- [x] Admin: manage users (suspend/role) + read-only all cards; cannot mutate other users' cards
+- [x] Tests: 63 passed (incl. claim-once, ownership, admin demotion guards)
+- [x] `npm run build` passed
+- [x] Docs sync: `AGENTS.md` (session identity + immutable version rules), `flow.md` (ownership, auth/admin API map), `docs/system-design.md` (schema update note), `README.md`
+- **Evidence (2026-07-21 verification round กับ Neon):**
+  - `prisma migrate status` กับ Neon (`ap-southeast-1`) — 4 migrations applied, schema up to date
+  - `npm run db:seed` กับ Neon — 13 templates + admin bootstrap (idempotent, ไม่ทับ published schema)
+  - `npm test` — **70/70 ผ่าน**, `npm run build` — ผ่าน
+  - Smoke flow (dev server + curl): register → login (credentials 302 + session มี role/status) → claim-device 200 → create card + PIN → guest verify-pin ถูก 200 / ผิด 401 (`remaining` ลด) → view 200 → admin login → `/api/admin/events` 200 ไม่มี `pinHash` → admin PATCH/DELETE การ์ดของ user อื่น = **404** → `/api/admin/users`, `/api/admin/templates` 200 → USER เรียก `/api/admin/users` = **403**
+
+### G6: Template Studio (Milestones A → B → C) — DONE 2026-07-21
+- [x] **A — Versioning:** `TemplateVersion` lifecycle Draft/Published/Deprecated/Archived; published immutable; `Event.templateVersionId` pin + backfill; seed ไม่ทับ published schema; ADR-5
+- [x] **A — Admin APIs:** `/api/admin/templates` list/create/get/update/duplicate/validate/publish/versions/rollback/assets (+ analytics)
+- [x] **A — Library UI:** `/admin/templates` search/filter/sort/pagination + metadata + publish confirmation/release notes (Admin-only)
+- [x] **B — Builder:** responsive 3-panel (Step Library / Flow Canvas / Properties), `@dnd-kit` reorder, undo/redo, mobile bottom-sheet mode
+- [x] **B — Data Model Designer:** field types ตาม IA + Basic/Pro settings + Global→Step→Element override แบบ allow-listed
+- [x] **B — Preview:** `StepRenderer` เดียวกับ guest + validation panel + jump-to-step
+- [x] **C — Expert rules:** declarative runtime rules (ไม่มี arbitrary JS/`eval`)
+- [x] **C — QA publish gate:** schema, sample data, a11y baseline, asset/byte budget, reduced-motion, minigame registry capability
+- [x] **C — Analytics:** `template_telemetry_events` จริงหลัง unlock token; admin analytics จาก unlock logs + telemetry (ไม่สร้างข้อมูลปลอม)
+- [x] **C — Marketplace metadata:** visibility / premium / featured / price label — **ไม่มี payment provider**
+- **Evidence (2026-07-21):**
+  - Migration: `20260721120000_template_studio_versions` (local Docker `:5435`)
+  - Seed: 13 templates + published v1 immutable policy
+  - `npm test` — **70/70 ผ่าน**
+  - `npm run build` — ผ่าน (routes รวม `/admin/templates`, studio APIs, telemetry)
+  - Compatibility: publish v2 ไม่ขยับ `Event.templateVersionId` ของ event เดิม (integration test)
+  - Template Studio UI ใช้ภาษาไทยทั้งหน้าคลังและตัวสร้าง: สถานะ, เมนู, คุณสมบัติ, โครงสร้างข้อมูล, การตรวจสอบ, เผยแพร่ และข้อมูลวิเคราะห์; `npm run build` ผ่าน
+
+### G7: Support & Account Security (A→E) — DONE 2026-07-21
+- Spec: `docs/support-ops-milestones.md` + `docs/milestones/A|B|C|D|E-*.md`
+- [x] **A — Account Security:** User schema (securityPin*, mustChange*, authVersion, username, phone), Security PIN ของบัญชี (bcrypt, 6 หลัก, lockout 5 ครั้ง/15 นาที), step-up JWT cookie `wf_admin_step_up` (5 นาที), admin reset password/PIN (temp จาก `crypto.randomBytes` โชว์ครั้งเดียว + `Cache-Control: no-store`, self-reset ถูกบล็อก), `/profile` (แก้ชื่อ/username/phone + เปลี่ยน/ตั้งรหัสผ่าน + PIN สำหรับ admin), `AdminSecurityPinModal` บังคับ admin ตั้ง PIN, `requireUser` re-check status+authVersion จาก DB (bump = force re-login)
+- [x] **B — Support Cases:** `/support/contact` (public, ไม่ต้อง login), token 32 bytes → sha256 ใน DB โชว์ครั้งเดียว, ติดตามเคส `/support/cases/:id?token=`, rate limit ipHash+deviceId (5/ชม.), CAPTCHA stub (`src/lib/captcha.ts` — Turnstile จริงเมื่อตั้ง `TURNSTILE_SECRET`), `/admin/support` list/filter/claim (race-safe `updateMany`)/status/priority/internal note, สถานะ NEW→CLAIMED→IN_PROGRESS→WAITING_USER→RESOLVED→CLOSED (+SPAM) + history, ปุ่มติดต่อเจ้าหน้าที่หน้า `/`
+- [x] **C — Chat:** `SupportConversation` unique userId (1 user = 1 ห้อง), `/support/chat` (user) + `/admin/inbox` (admin), polling 4s (**ไม่มี** Ably/Pusher keys — บันทึกใน Blocked), user เห็น admin เป็น 「เจ้าหน้าที่」 เท่านั้น / admin เห็น `Admin (ชื่อ)`, INTERNAL ซ่อนจาก user, unread counters, authorize server-side ทุก request
+- [x] **D — Hardening:** `NotificationAdapter` + ConsoleNotificationAdapter + `AppNotification` in-app (`/api/me/notifications`), authVersion bump ครบจุด (change/set password, admin reset), retention scripts `scripts/cleanup-logs.ts` + `scripts/cleanup-support-retention.ts` (รองรับ `--dry-run`), ล้าง ipHash/deviceId/uaDigest เคสปิด >30 วัน, ไม่เก็บ MAC/plain token
+- [x] **E — Logs:** `AuditLog` + `SystemLog` + action catalog (`src/lib/audit-actions.ts`), `writeAudit`/`writeSystemLog` (insert fail ไม่ throw — ลง system log แทน), `sanitizeMetadata` ตัด password/pin/token/secret/authorization/cookie (nested), `hashIp`/`digestUa` pepper จาก AUTH_SECRET, `/admin/logs` (Audit/System tabs + filter + pagination + export CSV/JSON ≤5000 แถว + audit การ export), retention: audit 365 วัน / system ERROR 180 / INFO 30
+- **Evidence (2026-07-21):**
+  - Migrations: `20260721150000_g7_support_ops` + `20260721153000_g7_fix_sender_type_column` applied กับ Neon
+  - `npm test` — **100/100 ผ่าน** (13 ไฟล์; ใหม่: account-security, support-case, support-chat integration + audit-log sanitize unit)
+  - `npm run build` — ผ่าน (routes ใหม่: `/profile`, `/support/*`, `/admin/support*`, `/admin/inbox*`, `/admin/logs`, APIs `me/*`, `admin/step-up`, `admin/users/[id]/reset-*`, `support/*`, `admin/support/*`, `admin/inbox/*`, `admin/logs/*`)
+  - Cleanup scripts dry-run ผ่าน (`cleanup-logs`, `cleanup-support-retention`)
+  - Security: PIN/password/token เก็บ hash เท่านั้น, audit metadata ผ่าน sanitize (มี test ยืนยันไม่รั่ว), step-up 428 → modal ยืนยัน PIN, self-reset DENIED + audit, ชื่อ admin ไม่หลุดใน payload ฝั่ง user (test ยืนยัน), `Event.pinHash` ไม่ถูกแตะ
+
 ## Deferred
 
-- **Phase 2 ที่เหลือ:** image optimization ขั้นสูง (sharp/resize), E2E ด้วย Playwright, analytics UI dashboard, PWA, Framer/Lottie polish
-- **G5 Phase 3:** email login, event types อื่น, guest reply, marketplace
+- Google OAuth credentials บน production (ตั้ง `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`)
+- image optimization / Playwright E2E / PWA
+- Phase 3: event types อื่น, guest reply
+- Marketplace **payment/checkout** (ต้องการ payment provider)
+- Automated browser a11y/performance audit (Playwright) สำหรับ publish gate ชั้นสูง
+- Designer / Reviewer / Analyst roles + In Review workflow (Milestone A ใช้ Admin-only ตามแผน)
 
 ---
 
@@ -106,12 +157,17 @@ Sources: `docs/system-design.md`, `flow.md`, `AGENTS.md`
 | 2026-07-21 | วันที่: DB/API เก็บ ISO เสมอ แปลง พ.ศ. เฉพาะชั้น UI — ADR-2 |
 | 2026-07-21 | รูปภาพ: `StorageAdapter` interface, MVP เก็บ local `uploads/`, เสิร์ฟผ่าน route — ADR-3 |
 | 2026-07-21 | Template = config ใน seed เท่านั้น ประกอบจาก step registry 21 types |
+| 2026-07-21 | Template Studio: event pin published version; Admin-only publish; rollback = publish clone — ADR-5 |
 
 ---
 
 ## Blocked
 
-_(ว่าง)_
+- Marketplace payment/checkout — ต้องการเลือก payment provider ก่อน
+- Full automated a11y/perf browser gate — ติด Playwright E2E ที่ยังไม่ติดตั้ง
+- **Realtime chat provider (Ably/Pusher)** — ยังไม่มี API keys; ตอนนี้ persistence ครบ + polling 4s fallback ใช้งานจริง (`/support/chat`, `/admin/inbox`) — เมื่อได้ keys ให้ publish หลัง commit DB + channel auth ต่อห้อง
+- **Turnstile CAPTCHA** — ยังไม่มี `TURNSTILE_SECRET`; `verifyCaptchaToken` เป็น stub ผ่านเสมอ (โค้ดตรวจจริงพร้อมแล้ว ตั้ง env ก็ทำงาน) — มี rate limit ip/device คุมแทนชั่วคราว
+- **Email notification provider** — ยังไม่เลือก provider; ใช้ `ConsoleNotificationAdapter` + in-app `AppNotification` ไปก่อน (ห้าม claim ว่าส่งอีเมลจริง)
 
 ## Completed
 
@@ -120,3 +176,6 @@ _(ว่าง)_
 - [x] 2026-07-21 — **Phase 2 Enhancement** (ปฏิทิน พ.ศ. + อัปโหลดรูป + Template Explorer + 21 step types + 13 templates + edit page ใหม่ + draft/duplicate/expiry — 62 tests ผ่าน)
 - [x] 2026-07-21 — **Template Studio IA Spec** (`docs/template-studio-ia.md`: โครงหน้าจอ, ตั้งค่าย่อย Basic/Pro/Expert, role permission, versioning/publish gate, analytics, rollout milestones)
 - [x] 2026-07-21 — **Expansion Roadmap** (`docs/expansion-roadmap.md`: ขยายจาก HBD สู่ Personal Micro-site Generator, จัดลำดับ Track A-E, แนะนำ Time Capsule เป็น M1, ระบุผลกระทบ UX/API/Domain + milestones + metrics)
+- [x] 2026-07-21 — **Template Studio A→B→C** (immutable versions + event pin, admin library/builder, QA gate, real telemetry analytics, marketplace metadata — 70 tests + build ผ่าน)
+- [x] 2026-07-21 — **G7 Support & Account Security specs** (`docs/support-ops-milestones.md`, milestones A–E รวม System/Audit Log, `docs/AI_SUPPORT_OPS_PROMPT.md`)
+- [x] 2026-07-21 — **G7 Support & Account Security A→E implemented** (Security PIN + step-up + admin reset, `/profile`, public support cases + admin console, chat 1:1 polling, NotificationAdapter + retention scripts, Audit/System Log + `/admin/logs` + export — 100 tests + build ผ่าน)

@@ -1,24 +1,26 @@
 import { PrismaClient } from "@prisma/client";
 
+import { SAMPLE_TEMPLATE_DATA } from "../src/lib/template-service";
+
 const prisma = new PrismaClient();
 
 type TemplateSeed = {
   slug: string;
   name: string;
   description: string;
-  thumbnail: string; // emoji:<char> แสดงเป็น thumbnail
+  thumbnail: string;
   category: string;
   tags: string[];
   mood: string;
   requiredAssetCount: number;
   isPremium?: boolean;
   sortOrder: number;
-  steps: { key: string; type: string; fields: string[] }[];
+  steps: { key: string; type: string; fields: string[]; enabled?: boolean; section?: string }[];
 };
 
 /**
- * Template = config ล้วนๆ ประกอบจาก step types ใน StepRenderer registry
- * เพิ่ม template ใหม่ = เพิ่ม object ที่นี่ ไม่ต้องเขียน component ใหม่
+ * Template catalog seed — metadata can upsert; published steps_schema is immutable.
+ * New schema changes create a draft version only when no draft exists and published differs.
  */
 const TEMPLATES: TemplateSeed[] = [
   {
@@ -32,9 +34,9 @@ const TEMPLATES: TemplateSeed[] = [
     requiredAssetCount: 0,
     sortOrder: 1,
     steps: [
-      { key: "opening", type: "gift-box", fields: ["title_text"] },
-      { key: "message", type: "text-reveal", fields: ["message_text", "sender_name"] },
-      { key: "cake", type: "candle-blow", fields: ["cake_style"] },
+      { key: "opening", type: "gift-box", fields: ["title_text"], section: "opening" },
+      { key: "message", type: "text-reveal", fields: ["message_text", "sender_name"], section: "body" },
+      { key: "cake", type: "candle-blow", fields: ["cake_style"], section: "finale" },
     ],
   },
   {
@@ -48,8 +50,8 @@ const TEMPLATES: TemplateSeed[] = [
     requiredAssetCount: 0,
     sortOrder: 2,
     steps: [
-      { key: "message", type: "text-reveal", fields: ["message_text", "sender_name"] },
-      { key: "cake", type: "candle-blow", fields: ["cake_style"] },
+      { key: "message", type: "text-reveal", fields: ["message_text", "sender_name"], section: "body" },
+      { key: "cake", type: "candle-blow", fields: ["cake_style"], section: "finale" },
     ],
   },
   {
@@ -63,10 +65,10 @@ const TEMPLATES: TemplateSeed[] = [
     requiredAssetCount: 3,
     sortOrder: 3,
     steps: [
-      { key: "opening", type: "gift-box", fields: ["title_text"] },
-      { key: "album", type: "photo-polaroid", fields: ["polaroid_caption"] },
-      { key: "message", type: "text-reveal", fields: ["message_text", "sender_name"] },
-      { key: "finale", type: "final-celebration", fields: ["final_message"] },
+      { key: "opening", type: "gift-box", fields: ["title_text"], section: "opening" },
+      { key: "album", type: "photo-polaroid", fields: ["polaroid_caption"], section: "body" },
+      { key: "message", type: "text-reveal", fields: ["message_text", "sender_name"], section: "body" },
+      { key: "finale", type: "final-celebration", fields: ["final_message"], section: "finale" },
     ],
   },
   {
@@ -80,10 +82,10 @@ const TEMPLATES: TemplateSeed[] = [
     requiredAssetCount: 3,
     sortOrder: 4,
     steps: [
-      { key: "countdown", type: "countdown", fields: ["countdown_title"] },
-      { key: "timeline", type: "memory-timeline", fields: ["timeline_caption"] },
-      { key: "message", type: "typewriter-message", fields: ["typewriter_text", "sender_name"] },
-      { key: "finale", type: "final-celebration", fields: ["final_message"] },
+      { key: "countdown", type: "countdown", fields: ["countdown_title"], section: "opening" },
+      { key: "timeline", type: "memory-timeline", fields: ["timeline_caption"], section: "body" },
+      { key: "message", type: "typewriter-message", fields: ["typewriter_text", "sender_name"], section: "body" },
+      { key: "finale", type: "final-celebration", fields: ["final_message"], section: "finale" },
     ],
   },
   {
@@ -97,10 +99,10 @@ const TEMPLATES: TemplateSeed[] = [
     requiredAssetCount: 1,
     sortOrder: 5,
     steps: [
-      { key: "game", type: "tap-the-balloon", fields: ["balloon_message"] },
-      { key: "photo", type: "photo-reveal", fields: ["photo_caption"] },
-      { key: "message", type: "text-reveal", fields: ["message_text", "sender_name"] },
-      { key: "finale", type: "confetti-pop", fields: ["confetti_message"] },
+      { key: "game", type: "tap-the-balloon", fields: ["balloon_message"], section: "opening" },
+      { key: "photo", type: "photo-reveal", fields: ["photo_caption"], section: "body" },
+      { key: "message", type: "text-reveal", fields: ["message_text", "sender_name"], section: "body" },
+      { key: "finale", type: "confetti-pop", fields: ["confetti_message"], section: "finale" },
     ],
   },
   {
@@ -114,9 +116,9 @@ const TEMPLATES: TemplateSeed[] = [
     requiredAssetCount: 4,
     sortOrder: 6,
     steps: [
-      { key: "game", type: "memory-match", fields: ["match_message"] },
-      { key: "slideshow", type: "photo-slideshow", fields: ["slideshow_caption"] },
-      { key: "finale", type: "final-celebration", fields: ["final_message", "sender_name"] },
+      { key: "game", type: "memory-match", fields: ["match_message"], section: "opening" },
+      { key: "slideshow", type: "photo-slideshow", fields: ["slideshow_caption"], section: "body" },
+      { key: "finale", type: "final-celebration", fields: ["final_message", "sender_name"], section: "finale" },
     ],
   },
   {
@@ -130,9 +132,9 @@ const TEMPLATES: TemplateSeed[] = [
     requiredAssetCount: 0,
     sortOrder: 7,
     steps: [
-      { key: "wheel", type: "spin-the-wheel", fields: ["wheel_wishes"] },
-      { key: "letter", type: "envelope-open", fields: ["envelope_message", "sender_name"] },
-      { key: "cake", type: "candle-blow", fields: ["cake_style"] },
+      { key: "wheel", type: "spin-the-wheel", fields: ["wheel_wishes"], section: "opening" },
+      { key: "letter", type: "envelope-open", fields: ["envelope_message", "sender_name"], section: "body" },
+      { key: "cake", type: "candle-blow", fields: ["cake_style"], section: "finale" },
     ],
   },
   {
@@ -146,9 +148,9 @@ const TEMPLATES: TemplateSeed[] = [
     requiredAssetCount: 1,
     sortOrder: 8,
     steps: [
-      { key: "scratch", type: "scratch-card", fields: ["scratch_caption"] },
-      { key: "message", type: "text-reveal", fields: ["message_text", "sender_name"] },
-      { key: "finale", type: "confetti-pop", fields: ["confetti_message"] },
+      { key: "scratch", type: "scratch-card", fields: ["scratch_caption"], section: "opening" },
+      { key: "message", type: "text-reveal", fields: ["message_text", "sender_name"], section: "body" },
+      { key: "finale", type: "confetti-pop", fields: ["confetti_message"], section: "finale" },
     ],
   },
   {
@@ -162,10 +164,10 @@ const TEMPLATES: TemplateSeed[] = [
     requiredAssetCount: 4,
     sortOrder: 9,
     steps: [
-      { key: "letter", type: "envelope-open", fields: ["envelope_message"] },
-      { key: "collage", type: "photo-collage", fields: ["collage_caption"] },
-      { key: "message", type: "typewriter-message", fields: ["typewriter_text", "sender_name"] },
-      { key: "finale", type: "final-celebration", fields: ["final_message"] },
+      { key: "letter", type: "envelope-open", fields: ["envelope_message"], section: "opening" },
+      { key: "collage", type: "photo-collage", fields: ["collage_caption"], section: "body" },
+      { key: "message", type: "typewriter-message", fields: ["typewriter_text", "sender_name"], section: "body" },
+      { key: "finale", type: "final-celebration", fields: ["final_message"], section: "finale" },
     ],
   },
   {
@@ -179,9 +181,9 @@ const TEMPLATES: TemplateSeed[] = [
     requiredAssetCount: 0,
     sortOrder: 10,
     steps: [
-      { key: "game", type: "find-the-gift", fields: ["gift_message"] },
-      { key: "message", type: "text-reveal", fields: ["message_text", "sender_name"] },
-      { key: "cake", type: "candle-blow", fields: ["cake_style"] },
+      { key: "game", type: "find-the-gift", fields: ["gift_message"], section: "opening" },
+      { key: "message", type: "text-reveal", fields: ["message_text", "sender_name"], section: "body" },
+      { key: "cake", type: "candle-blow", fields: ["cake_style"], section: "finale" },
     ],
   },
   {
@@ -199,9 +201,10 @@ const TEMPLATES: TemplateSeed[] = [
         key: "quiz",
         type: "birthday-quiz",
         fields: ["quiz_question", "quiz_option_1", "quiz_option_2", "quiz_option_3", "quiz_correct"],
+        section: "opening",
       },
-      { key: "photo", type: "photo-reveal", fields: ["photo_caption"] },
-      { key: "finale", type: "final-celebration", fields: ["final_message", "sender_name"] },
+      { key: "photo", type: "photo-reveal", fields: ["photo_caption"], section: "body" },
+      { key: "finale", type: "final-celebration", fields: ["final_message", "sender_name"], section: "finale" },
     ],
   },
   {
@@ -215,9 +218,9 @@ const TEMPLATES: TemplateSeed[] = [
     requiredAssetCount: 1,
     sortOrder: 12,
     steps: [
-      { key: "puzzle", type: "puzzle-photo", fields: ["puzzle_caption"] },
-      { key: "message", type: "text-reveal", fields: ["message_text", "sender_name"] },
-      { key: "finale", type: "confetti-pop", fields: ["confetti_message"] },
+      { key: "puzzle", type: "puzzle-photo", fields: ["puzzle_caption"], section: "opening" },
+      { key: "message", type: "text-reveal", fields: ["message_text", "sender_name"], section: "body" },
+      { key: "finale", type: "confetti-pop", fields: ["confetti_message"], section: "finale" },
     ],
   },
   {
@@ -231,20 +234,161 @@ const TEMPLATES: TemplateSeed[] = [
     requiredAssetCount: 2,
     sortOrder: 13,
     steps: [
-      { key: "game", type: "catch-the-heart", fields: ["heart_message"] },
-      { key: "slideshow", type: "photo-slideshow", fields: ["slideshow_caption"] },
-      { key: "finale", type: "final-celebration", fields: ["final_message", "sender_name"] },
+      { key: "game", type: "catch-the-heart", fields: ["heart_message"], section: "opening" },
+      { key: "slideshow", type: "photo-slideshow", fields: ["slideshow_caption"], section: "body" },
+      { key: "finale", type: "final-celebration", fields: ["final_message", "sender_name"], section: "finale" },
     ],
   },
 ];
 
+function buildStepsSchema(steps: TemplateSeed["steps"]) {
+  return {
+    schemaVersion: 1,
+    steps: steps.map((s) => ({
+      key: s.key,
+      type: s.type,
+      fields: s.fields,
+      enabled: s.enabled ?? true,
+      section: s.section ?? "body",
+      settings: {},
+      elementOverrides: {},
+    })),
+  };
+}
+
+function buildSampleData(steps: TemplateSeed["steps"]) {
+  const fields = new Set<string>();
+  for (const step of steps) {
+    for (const f of step.fields) fields.add(f);
+  }
+  const sample: Record<string, string> = {};
+  for (const field of fields) {
+    sample[field] = SAMPLE_TEMPLATE_DATA[field] ?? "ตัวอย่างข้อความ";
+  }
+  return sample;
+}
+
+function buildDefaultDataModel(steps: TemplateSeed["steps"]) {
+  const fields: Record<
+    string,
+    {
+      key: string;
+      type: string;
+      labelTh: string;
+      labelEn: string;
+      required: boolean;
+      sampleValue: string;
+    }
+  > = {};
+  for (const step of steps) {
+    for (const key of step.fields) {
+      if (fields[key]) continue;
+      fields[key] = {
+        key,
+        type: "long-text",
+        labelTh: key,
+        labelEn: key,
+        required: true,
+        sampleValue: SAMPLE_TEMPLATE_DATA[key] ?? "ตัวอย่างข้อความ",
+      };
+    }
+  }
+  return { fields: Object.values(fields) };
+}
+
+function stableJson(value: unknown) {
+  return JSON.stringify(value);
+}
+
+async function ensurePublishedVersion(params: {
+  templateId: string;
+  stepsSchema: ReturnType<typeof buildStepsSchema>;
+  sampleData: Record<string, string>;
+  dataModel: ReturnType<typeof buildDefaultDataModel>;
+}) {
+  const published = await prisma.templateVersion.findFirst({
+    where: { templateId: params.templateId, status: "PUBLISHED" },
+    orderBy: { version: "desc" },
+  });
+
+  if (!published) {
+    const created = await prisma.templateVersion.create({
+      data: {
+        templateId: params.templateId,
+        version: 1,
+        status: "PUBLISHED",
+        schemaVersion: 1,
+        stepsSchema: params.stepsSchema,
+        dataModel: params.dataModel,
+        settings: {
+          mode: "basic",
+          theme: { preset: "cute-pastel" },
+          motion: { intensity: "normal", reducedMotionPolicy: "honor-prefers" },
+        },
+        sampleData: params.sampleData,
+        releaseNotes: "Seed published v1",
+        publishedAt: new Date(),
+      },
+    });
+    await prisma.template.update({
+      where: { id: params.templateId },
+      data: {
+        currentPublishedVersionId: created.id,
+        stepsSchema: params.stepsSchema,
+        publishedAt: created.publishedAt,
+      },
+    });
+    return;
+  }
+
+  // Never mutate published steps_schema — only refresh catalog denormalized cache from published
+  await prisma.template.update({
+    where: { id: params.templateId },
+    data: {
+      currentPublishedVersionId: published.id,
+      stepsSchema: published.stepsSchema as object,
+      publishedAt: published.publishedAt ?? new Date(),
+    },
+  });
+
+  const publishedSteps = stableJson(published.stepsSchema);
+  const seedSteps = stableJson(params.stepsSchema);
+  if (publishedSteps === seedSteps) return;
+
+  const existingDraft = await prisma.templateVersion.findFirst({
+    where: { templateId: params.templateId, status: "DRAFT" },
+    orderBy: { version: "desc" },
+  });
+  if (existingDraft) return;
+
+  const maxVersion = await prisma.templateVersion.aggregate({
+    where: { templateId: params.templateId },
+    _max: { version: true },
+  });
+  await prisma.templateVersion.create({
+    data: {
+      templateId: params.templateId,
+      version: (maxVersion._max.version ?? published.version) + 1,
+      status: "DRAFT",
+      schemaVersion: 1,
+      stepsSchema: params.stepsSchema,
+      dataModel: params.dataModel,
+      settings: published.settings as object,
+      sampleData: params.sampleData,
+      releaseNotes: null,
+    },
+  });
+}
+
 async function main() {
   for (const t of TEMPLATES) {
-    const data = {
+    const stepsSchema = buildStepsSchema(t.steps);
+    const sampleData = buildSampleData(t.steps);
+    const dataModel = buildDefaultDataModel(t.steps);
+    const meta = {
       name: t.name,
       description: t.description,
       thumbnailUrl: t.thumbnail,
-      stepsSchema: { steps: t.steps },
       isActive: true,
       category: t.category,
       tags: t.tags,
@@ -252,15 +396,66 @@ async function main() {
       requiredAssetCount: t.requiredAssetCount,
       isPremium: t.isPremium ?? false,
       sortOrder: t.sortOrder,
-      publishedAt: new Date(),
     };
-    await prisma.template.upsert({
-      where: { slug: t.slug },
-      update: data,
-      create: { slug: t.slug, ...data },
-    });
+
+    const existing = await prisma.template.findUnique({ where: { slug: t.slug } });
+    if (!existing) {
+      const created = await prisma.template.create({
+        data: {
+          slug: t.slug,
+          ...meta,
+          stepsSchema,
+          publishedAt: new Date(),
+        },
+      });
+      await ensurePublishedVersion({
+        templateId: created.id,
+        stepsSchema,
+        sampleData,
+        dataModel,
+      });
+    } else {
+      await prisma.template.update({
+        where: { id: existing.id },
+        data: meta,
+      });
+      await ensurePublishedVersion({
+        templateId: existing.id,
+        stepsSchema,
+        sampleData,
+        dataModel,
+      });
+    }
   }
-  console.log(`Seeded ${TEMPLATES.length} templates`);
+  console.log(`Seeded ${TEMPLATES.length} templates (metadata upsert; published schemas immutable)`);
+
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (adminEmail && adminPassword) {
+    const bcrypt = await import("bcryptjs");
+    const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
+    if (!existing) {
+      await prisma.user.create({
+        data: {
+          email: adminEmail,
+          name: "Admin",
+          passwordHash: await bcrypt.hash(adminPassword, 12),
+          role: "ADMIN",
+        },
+      });
+      console.log(`Bootstrapped ADMIN user: ${adminEmail}`);
+    } else if (existing.role !== "ADMIN") {
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: { role: "ADMIN" },
+      });
+      console.log(`Promoted existing user to ADMIN: ${adminEmail}`);
+    } else {
+      console.log(`Admin already exists: ${adminEmail}`);
+    }
+  } else {
+    console.log("Skip admin bootstrap (set ADMIN_EMAIL + ADMIN_PASSWORD to create)");
+  }
 }
 
 main()

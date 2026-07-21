@@ -2,6 +2,11 @@ import type { Metadata, Viewport } from "next";
 import { Mali } from "next/font/google";
 import type { ReactNode } from "react";
 
+import { AdminSecurityPinModal } from "@/components/AdminSecurityPinModal";
+import { AppNav } from "@/components/AppNav";
+import { ClaimOnLogin } from "@/components/ClaimOnLogin";
+import { Providers } from "@/components/Providers";
+
 import "./globals.css";
 
 const mali = Mali({
@@ -24,7 +29,14 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="th">
-      <body className={mali.className}>{children}</body>
+      <body className={mali.className}>
+        <Providers>
+          <AppNav />
+          <ClaimOnLogin />
+          <AdminSecurityPinModal />
+          {children}
+        </Providers>
+      </body>
     </html>
   );
 }

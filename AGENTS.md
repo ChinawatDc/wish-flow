@@ -22,17 +22,24 @@ Phase 1 MVP ตาม `goal.md` G1: create → PIN/QR → guest unlock → templ
 
 ## Rules
 - ห้ามเก็บ PIN แบบ plain text — ใช้ bcrypt หรือ argon2
+- **Security PIN ของบัญชี ≠ Event PIN ของการ์ด** — PIN บัญชี (`users.security_pin_hash`, lockout 5/15 นาที, ใช้ step-up admin) แยกจาก `events.pin_hash` (guest unlock) เด็ดขาด — ห้ามใช้ปนกัน
+- Audit/System log เขียนผ่าน `writeAudit`/`writeSystemLog` เท่านั้น + `sanitizeMetadata` — ห้ามมี password/PIN/token/secret ใน log; action มาจาก `src/lib/audit-actions.ts`
+- Admin action อ่อนไหว (reset password/PIN ของ user อื่น) ต้องผ่าน step-up (`requireAdminStepUp`, cookie `wf_admin_step_up` 5 นาที) และห้าม reset ของตัวเองผ่าน admin console
+- เปลี่ยน/รีเซ็ตรหัสผ่านหรือ PIN → bump `authVersion` เสมอ (invalidate JWT เก่า)
+- Creator mutation ต้องใช้ session ผู้ใช้ที่ login แล้ว และ `ownerUserId` ตรงกับ session — ห้ามเชื่อ user id จาก body
+- Admin **ห้าม** mutate การ์ดของ user คนอื่น (ดูได้อย่างเดียวผ่าน `/api/admin/events*`)
 - ห้ามเก็บรูป base64/binary ใน Postgres — ผ่าน `StorageAdapter` (`src/lib/storage.ts`) เท่านั้น, metadata ใน `event_assets`
 - อัปโหลดต้องผ่าน `validateUpload` (magic bytes + MIME + ext + ≤5MB) และตั้งชื่อไฟล์ใหม่เป็น UUID
 - วันที่ใน DB/API เป็น ISO/ค.ศ. เสมอ — แปลง พ.ศ. เฉพาะ UI ผ่าน `src/lib/thai-date.ts`
 - Template ใหม่ = config ใน `prisma/seed.ts` ประกอบจาก step registry — ห้ามเขียน component ต่อ template
 - Template query API ต้อง validate + จำกัด limit (≤24)
-- ห้ามเชื่อ identity จาก client body — ใช้ `device_token` จาก httpOnly cookie เท่านั้น
+- ห้ามเชื่อ identity จาก client body — creator ใช้ session (Auth.js JWT), guest ใช้ unlock cookie; `wf_device_token` ใช้เฉพาะ claim การ์ด legacy ครั้งเดียว
 - Creator mutation ต้องเช็ค ownership ทุก request
 - Guest `view` ต้องมี short-lived unlock token หลัง verify-pin สำเร็จ
 - Event id เป็น UUID ไม่ใช่ auto-increment
 - Template ต้องผ่าน `steps_schema` + `StepRenderer` — ห้าม hardcode field HBD ในหน้า guest
-- Schema ตรง `docs/system-design.md` §5 (creators, templates, events, event_access_logs, event_assets)
+- Published `template_versions` immutable — publish ใหม่ห้ามขยับ `events.template_version_id` ของ event เดิม (ADR-5)
+- Schema ตรง `docs/system-design.md` §5 + ส่วนอัปเดต (users, accounts, template_versions, template_assets, template_telemetry_events)
 - API อย่างน้อยครบ `flow.md` §5 / design §7
 - UI mobile-first: ใช้งานได้บนมือถือ, แท็บเล็ต, เดสก์ท็อป
 - เปลี่ยน schema ผ่าน Prisma migrate เท่านั้น

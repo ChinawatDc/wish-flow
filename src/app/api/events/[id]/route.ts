@@ -3,70 +3,79 @@ import {
   updateOwnedEvent,
 } from "@/lib/event-service";
 import { deleteAllAssetFiles, listAssets } from "@/lib/asset-service";
+import { authErrorResponse, requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/db";
-import { requireCreator } from "@/lib/device-token";
 import { jsonError, jsonOk } from "@/lib/http";
 import { updateEventSchema } from "@/lib/validation";
 
 type Params = { params: Promise<{ id: string }> };
 
-async function getOwnedEvent(id: string, creatorId: string) {
+async function getOwnedEvent(id: string, userId: string) {
   return prisma.event.findFirst({
-    where: { id, creatorId },
-    include: { template: true },
+    where: { id, ownerUserId: userId },
+    include: {
+      template: true,
+      templateVersion: true,
+    },
   });
 }
 
 export async function GET(_request: Request, { params }: Params) {
-  const { id } = await params;
-  const { creator } = await requireCreator();
-  const event = await getOwnedEvent(id, creator.id);
-  if (!event) return jsonError("ไม่พบอีเวนต์นี้", 404);
+  try {
+    const { id } = await params;
+    const user = await requireUser();
+    const event = await getOwnedEvent(id, user.id);
+    if (!event) return jsonError("ไม่พบอีเวนต์นี้", 404);
 
-  const [assets, unlockStats] = await Promise.all([
-    listAssets(id),
-    prisma.eventAccessLog.groupBy({
-      by: ["success"],
-      where: { eventId: id },
-      _count: true,
-    }),
-  ]);
+    const [assets, unlockStats] = await Promise.all([
+      listAssets(id),
+      prisma.eventAccessLog.groupBy({
+        by: ["success"],
+        where: { eventId: id },
+        _count: true,
+      }),
+    ]);
 
-  const unlockSuccess = unlockStats.find((s) => s.success)?._count ?? 0;
-  const unlockFail = unlockStats.find((s) => !s.success)?._count ?? 0;
+    const unlockSuccess = unlockStats.find((s) => s.success)?._count ?? 0;
+    const unlockFail = unlockStats.find((s) => !s.success)?._count ?? 0;
 
-  return jsonOk({
-    id: event.id,
-    name: event.name,
-    eventDate: event.eventDate?.toISOString().slice(0, 10) ?? null,
-    templateId: event.templateId,
-    templateData: event.templateData,
-    status: event.status,
-    viewCount: event.viewCount,
-    expiresAt: event.expiresAt?.toISOString().slice(0, 10) ?? null,
-    createdAt: event.createdAt.toISOString(),
-    updatedAt: event.updatedAt.toISOString(),
-    assets,
-    stats: { unlockSuccess, unlockFail },
-    template: event.template
-      ? {
-          id: event.template.id,
-          slug: event.template.slug,
-          name: event.template.name,
-          description: event.template.description,
-          thumbnailUrl: event.template.thumbnailUrl,
-          category: event.template.category,
-          stepsSchema: event.template.stepsSchema,
-        }
-      : null,
-  });
+    return jsonOk({
+      id: event.id,
+      name: event.name,
+      eventDate: event.eventDate?.toISOString().slice(0, 10) ?? null,
+      templateId: event.templateId,
+      templateVersionId: event.templateVersionId,
+      templateData: event.templateData,
+      status: event.status,
+      viewCount: event.viewCount,
+      expiresAt: event.expiresAt?.toISOString().slice(0, 10) ?? null,
+      createdAt: event.createdAt.toISOString(),
+      updatedAt: event.updatedAt.toISOString(),
+      assets,
+      stats: { unlockSuccess, unlockFail },
+      template: event.template
+        ? {
+            id: event.template.id,
+            slug: event.template.slug,
+            name: event.template.name,
+            description: event.template.description,
+            thumbnailUrl: event.template.thumbnailUrl,
+            category: event.template.category,
+            stepsSchema:
+              event.templateVersion?.stepsSchema ?? event.template.stepsSchema,
+            version: event.templateVersion?.version ?? null,
+          }
+        : null,
+    });
+  } catch (error) {
+    return authErrorResponse(error);
+  }
 }
 
 export async function PATCH(request: Request, { params }: Params) {
-  const { id } = await params;
-  const { deviceToken } = await requireCreator();
-
   try {
+    const { id } = await params;
+    const user = await requireUser();
     const body = await request.json();
     const parsed = updateEventSchema.safeParse(body);
     if (!parsed.success) {
@@ -77,13 +86,17 @@ export async function PATCH(request: Request, { params }: Params) {
 
     if (data.templateId) {
       const template = await prisma.template.findFirst({
-        where: { id: data.templateId, isActive: true },
+        where: {
+          id: data.templateId,
+          isActive: true,
+          currentPublishedVersionId: { not: null },
+        },
       });
       if (!template) return jsonError("ไม่พบเทมเพลตนี้", 400);
     }
 
     const result = await updateOwnedEvent({
-      deviceToken,
+      userId: user.id,
       eventId: id,
       data: {
         ...(data.name !== undefined ? { name: data.name } : {}),
@@ -108,10 +121,10 @@ export async function PATCH(request: Request, { params }: Params) {
     });
 
     if ("error" in result) {
-      return jsonError(
-        result.error === "not_found" ? "ไม่พบอีเวนต์นี้" : "ไม่มีสิทธิ์แก้ไขอีเวนต์นี้",
-        result.error === "not_found" ? 404 : 401,
-      );
+      if (result.error === "template_unavailable") {
+        return jsonError("เทมเพลตนี้ยังไม่มีเวอร์ชันที่เผยแพร่", 400);
+      }
+      return jsonError("ไม่พบอีเวนต์นี้", 404);
     }
 
     return jsonOk({
@@ -124,28 +137,25 @@ export async function PATCH(request: Request, { params }: Params) {
       viewCount: result.event.viewCount,
     });
   } catch (error) {
-    console.error(error);
-    return jsonError("บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง", 500);
+    if (error instanceof SyntaxError) return jsonError("ข้อมูลไม่ถูกต้อง", 400);
+    return authErrorResponse(error);
   }
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
-  const { id } = await params;
-  const { deviceToken } = await requireCreator();
-  // ลบไฟล์รูปก่อน (DB rows หายด้วย cascade ตอนลบ event)
-  const { creator } = await requireCreator();
-  const owned = await prisma.event.findFirst({
-    where: { id, creatorId: creator.id },
-    select: { id: true },
-  });
-  if (owned) await deleteAllAssetFiles(id);
+  try {
+    const { id } = await params;
+    const user = await requireUser();
+    const owned = await prisma.event.findFirst({
+      where: { id, ownerUserId: user.id },
+      select: { id: true },
+    });
+    if (owned) await deleteAllAssetFiles(id);
 
-  const result = await deleteOwnedEvent(deviceToken, id);
-  if ("error" in result) {
-    return jsonError(
-      result.error === "not_found" ? "ไม่พบอีเวนต์นี้" : "ไม่มีสิทธิ์ลบอีเวนต์นี้",
-      result.error === "not_found" ? 404 : 401,
-    );
+    const result = await deleteOwnedEvent(user.id, id);
+    if ("error" in result) return jsonError("ไม่พบอีเวนต์นี้", 404);
+    return jsonOk({ ok: true });
+  } catch (error) {
+    return authErrorResponse(error);
   }
-  return jsonOk({ ok: true });
 }

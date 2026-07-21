@@ -11,3 +11,11 @@ next-env.d.ts
 
 # uploaded event assets (local storage adapter)
 /uploads
+
+# local verify / agent scratch artifacts
+/_final_verify.txt
+/_run_verify.sh
+/_verify_*.log
+/_verify_*.txt
+/.tmp/
+/tmp/

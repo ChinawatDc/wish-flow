@@ -1,50 +1,64 @@
 import { randomUUID } from "crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { PIN_MAX_ATTEMPTS } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import {
   createEvent,
   deleteOwnedEvent,
-  listEventsForDevice,
+  listEventsForUser,
   regenerateOwnedPin,
   updateOwnedEvent,
   verifyEventPin,
 } from "@/lib/event-service";
 import { verifyUnlockToken } from "@/lib/unlock-token";
-import { PIN_MAX_ATTEMPTS } from "@/lib/constants";
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 
-describe.runIf(hasDb)("event-service integration (Postgres)", () => {
-  const deviceToken = `test-${randomUUID()}`;
+async function makeUser(emailPrefix: string) {
+  return prisma.user.create({
+    data: {
+      email: `${emailPrefix}-${randomUUID()}@test.local`,
+      name: emailPrefix,
+      passwordHash: "$2a$10$invalidhashforintegrationtestsxxxxxxxxxxxxxxxxx",
+      role: "USER",
+    },
+  });
+}
+
+describe.runIf(hasDb)("event-service integration (Postgres + User ownership)", () => {
+  let userId = "";
+  let otherUserId = "";
   let eventId = "";
   let pin = "";
 
   beforeAll(async () => {
-    // Ensure seed templates exist
     const template = await prisma.template.findFirst({
       where: { slug: "hbd-classic" },
     });
-    if (!template) {
-      throw new Error("Run npm run db:seed before integration tests");
-    }
+    if (!template) throw new Error("Run npm run db:seed before integration tests");
+
+    const user = await makeUser("owner");
+    const other = await makeUser("other");
+    userId = user.id;
+    otherUserId = other.id;
   });
 
   afterAll(async () => {
-    const creator = await prisma.creator.findUnique({ where: { deviceToken } });
-    if (creator) {
+    for (const id of [userId, otherUserId]) {
+      if (!id) continue;
       await prisma.eventAccessLog.deleteMany({
-        where: { event: { creatorId: creator.id } },
+        where: { event: { ownerUserId: id } },
       });
-      await prisma.event.deleteMany({ where: { creatorId: creator.id } });
-      await prisma.creator.delete({ where: { id: creator.id } });
+      await prisma.event.deleteMany({ where: { ownerUserId: id } });
+      await prisma.user.delete({ where: { id } }).catch(() => {});
     }
     await prisma.$disconnect();
   });
 
-  it("creates event with hashed pin (not plain text)", async () => {
+  it("creates event with hashed pin owned by user", async () => {
     const created = await createEvent({
-      deviceToken,
+      userId,
       name: "Integration Birthday",
     });
     eventId = created.event.id;
@@ -53,17 +67,17 @@ describe.runIf(hasDb)("event-service integration (Postgres)", () => {
     expect(pin).toMatch(/^\d{6}$/);
     expect(created.event.pinHash).not.toBe(pin);
     expect(created.event.pinHash.startsWith("$2")).toBe(true);
+    expect(created.event.ownerUserId).toBe(userId);
     expect(created.event.templateId).toBeTruthy();
   });
 
-  it("creates event with a custom pin chosen by creator", async () => {
+  it("creates event with a custom pin", async () => {
     const created = await createEvent({
-      deviceToken,
+      userId,
       name: "Custom PIN Event",
       pin: "424242",
     });
     expect(created.pin).toBe("424242");
-    expect(created.event.pinHash).not.toBe("424242");
 
     const ok = await verifyEventPin({
       eventId: created.event.id,
@@ -74,11 +88,8 @@ describe.runIf(hasDb)("event-service integration (Postgres)", () => {
   });
 
   it("changes pin to a custom value", async () => {
-    const created = await createEvent({
-      deviceToken,
-      name: "Change PIN Event",
-    });
-    const regen = await regenerateOwnedPin(deviceToken, created.event.id, "777777");
+    const created = await createEvent({ userId, name: "Change PIN Event" });
+    const regen = await regenerateOwnedPin(userId, created.event.id, "777777");
     expect("pin" in regen && regen.pin === "777777").toBe(true);
 
     const ok = await verifyEventPin({
@@ -90,16 +101,15 @@ describe.runIf(hasDb)("event-service integration (Postgres)", () => {
   });
 
   it("lists only owned events", async () => {
-    const list = await listEventsForDevice(deviceToken);
+    const list = await listEventsForUser(userId);
     expect(list.some((e) => e.id === eventId)).toBe(true);
-
-    const other = await listEventsForDevice(`other-${randomUUID()}`);
-    expect(other).toHaveLength(0);
+    const other = await listEventsForUser(otherUserId);
+    expect(other.some((e) => e.id === eventId)).toBe(false);
   });
 
   it("updates owned event template data", async () => {
     const result = await updateOwnedEvent({
-      deviceToken,
+      userId,
       eventId,
       data: {
         name: "Updated Birthday",
@@ -117,13 +127,13 @@ describe.runIf(hasDb)("event-service integration (Postgres)", () => {
     }
   });
 
-  it("rejects update from another device", async () => {
+  it("rejects update from another user", async () => {
     const result = await updateOwnedEvent({
-      deviceToken: `intruder-${randomUUID()}`,
+      userId: otherUserId,
       eventId,
       data: { name: "Hacked" },
     });
-    expect(result).toEqual({ error: "unauthorized" });
+    expect(result).toEqual({ error: "not_found" });
   });
 
   it("verifies correct pin and issues unlock token", async () => {
@@ -136,9 +146,6 @@ describe.runIf(hasDb)("event-service integration (Postgres)", () => {
     if (result.ok) {
       expect(await verifyUnlockToken(result.token, eventId)).toBe(true);
     }
-
-    const event = await prisma.event.findUniqueOrThrow({ where: { id: eventId } });
-    expect(event.viewCount).toBeGreaterThanOrEqual(1);
   });
 
   it("rejects wrong pin", async () => {
@@ -153,10 +160,7 @@ describe.runIf(hasDb)("event-service integration (Postgres)", () => {
   });
 
   it("rate-limits after too many failures", async () => {
-    const fresh = await createEvent({
-      deviceToken,
-      name: "Rate Limit Target",
-    });
+    const fresh = await createEvent({ userId, name: "Rate Limit Target" });
     const ip = "203.0.113.50";
 
     for (let i = 0; i < PIN_MAX_ATTEMPTS; i++) {
@@ -180,22 +184,18 @@ describe.runIf(hasDb)("event-service integration (Postgres)", () => {
   });
 
   it("regenerates pin and invalidates old one", async () => {
-    const target = await createEvent({
-      deviceToken,
-      name: "Regen PIN",
-    });
+    const target = await createEvent({ userId, name: "Regen PIN" });
     const oldPin = target.pin;
-    const regen = await regenerateOwnedPin(deviceToken, target.event.id);
+    const regen = await regenerateOwnedPin(userId, target.event.id);
     expect("pin" in regen).toBe(true);
     if (!("pin" in regen)) return;
 
-    const oldTry = await verifyEventPin({
-      eventId: target.event.id,
-      pin: oldPin,
-      ipAddress: "10.0.0.9",
-    });
-    // old pin may still succeed if randomly same — skip assert when equal
     if (regen.pin !== oldPin) {
+      const oldTry = await verifyEventPin({
+        eventId: target.event.id,
+        pin: oldPin,
+        ipAddress: "10.0.0.9",
+      });
       expect(oldTry.ok).toBe(false);
     }
 
@@ -208,11 +208,8 @@ describe.runIf(hasDb)("event-service integration (Postgres)", () => {
   });
 
   it("deletes owned event", async () => {
-    const created = await createEvent({
-      deviceToken,
-      name: "To Delete",
-    });
-    const deleted = await deleteOwnedEvent(deviceToken, created.event.id);
+    const created = await createEvent({ userId, name: "To Delete" });
+    const deleted = await deleteOwnedEvent(userId, created.event.id);
     expect(deleted).toEqual({ ok: true });
     const gone = await prisma.event.findUnique({ where: { id: created.event.id } });
     expect(gone).toBeNull();

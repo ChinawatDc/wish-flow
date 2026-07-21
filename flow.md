@@ -23,7 +23,8 @@ User flows + ลำดับ implement ที่ agent ต้องตาม
        → แสดง view_count
 ```
 
-**Ownership:** cookie `device_token` — ไม่บังคับสมัครสมาชิก
+**Ownership:** บัญชีผู้ใช้ (`ownerUserId` จาก session) — ต้อง login ก่อนสร้าง/แก้การ์ด
+การ์ดเดิมที่ผูก `wf_device_token` จะถูก claim เข้าบัญชีอัตโนมัติครั้งเดียวหลัง login (`POST /api/auth/claim-device`)
 
 ---
 
@@ -49,10 +50,15 @@ User flows + ลำดับ implement ที่ agent ต้องตาม
 verify-pin:
   rate-limit(IP + eventId) → compare bcrypt(pin) → issue unlock token
 view:
-  require unlock token → return template_data (sanitize)
+  require unlock token → return template_data (sanitize) จาก pinned template version
 creator mutations:
-  require device_token matches event.creator
+  require session (Auth.js JWT) && event.ownerUserId === session.user.id
+admin:
+  require role === ADMIN — ดูการ์ดทุกใบ read-only, จัดการ users, จัดการ Template Studio
+  ห้าม mutate การ์ดของ user คนอื่น
 ```
+
+**Roles:** `USER` / `ADMIN` (ตาราง `users`) + Guest (PIN, ไม่ใช่บัญชี) — ดู `docs/adr.md` ADR-4
 
 ---
 
@@ -89,7 +95,47 @@ creator mutations:
 | GET | `/api/templates/:slug` | รายละเอียดเทมเพลต |
 | GET | `/api/templates/:slug/preview` | ข้อมูลตัวอย่างสำหรับ preview (ไม่แตะ event จริง) |
 | POST | `/api/e/:id/verify-pin` | guest unlock (rate-limited) |
-| GET | `/api/e/:id/view` | ต้องมี unlock token (+assets) |
+| GET | `/api/e/:id/view` | ต้องมี unlock token (+assets) — schema จาก pinned version |
+| POST | `/api/e/:id/telemetry` | guest funnel telemetry (ต้องมี unlock token) |
+| POST | `/api/auth/register` | สมัครด้วยอีเมล/รหัสผ่าน |
+| GET/POST | `/api/auth/[...nextauth]` | Auth.js (Credentials + Google) |
+| POST | `/api/auth/claim-device` | claim การ์ด legacy จาก device cookie ครั้งเดียวหลัง login |
+| GET | `/api/admin/users` | Admin: list/search ผู้ใช้ |
+| PATCH | `/api/admin/users/:id` | Admin: suspend/reactivate, เปลี่ยน role (มี last-admin guard) |
+| GET | `/api/admin/events` | Admin: การ์ดทุกบัญชี read-only (ไม่มี pinHash) |
+| GET | `/api/admin/events/:id` | Admin: รายละเอียดการ์ด read-only |
+| GET/POST | `/api/admin/templates` | Admin: Template Studio list/create draft |
+| GET/PATCH | `/api/admin/templates/:id` | Admin: metadata + draft editing |
+| POST | `/api/admin/templates/:id/validate` | ตรวจ schema/sample/QA gate |
+| POST | `/api/admin/templates/:id/publish` | publish (immutable, ต้องมี release notes) |
+| POST | `/api/admin/templates/:id/duplicate` | ทำสำเนาเป็น draft ใหม่ |
+| GET | `/api/admin/templates/:id/versions` | ประวัติ version |
+| POST | `/api/admin/templates/:id/rollback` | rollback = publish clone version ใหม่ |
+| GET/POST | `/api/admin/templates/:id/assets` | template assets (StorageAdapter) |
+| GET | `/api/admin/templates/:id/analytics` | usage/unlock/drop-off จากข้อมูลจริง |
+| GET/PATCH | `/api/me/profile` | โปรไฟล์ (name, username, phone — อีเมล read-only) |
+| POST | `/api/me/change-password` | เปลี่ยนรหัสผ่าน (bump authVersion → re-login) |
+| POST | `/api/me/set-password` | ตั้งรหัสผ่านครั้งแรก (บัญชี OAuth) |
+| POST/PATCH | `/api/me/security-pin` | ตั้ง/เปลี่ยน Security PIN ของบัญชี (lockout 5/15 นาที) |
+| GET | `/api/me/security-status` | สถานะ hasPin / mustChange* (สำหรับ modal) |
+| GET/PATCH | `/api/me/notifications` | in-app notifications + mark all read |
+| POST | `/api/admin/step-up/verify-pin` | ยืนยัน Security PIN → step-up cookie 5 นาที |
+| POST | `/api/admin/users/:id/reset-password` | ต้อง step-up; temp password โชว์ครั้งเดียว (self-reset ถูกบล็อก) |
+| POST | `/api/admin/users/:id/reset-security-pin` | ต้อง step-up; temp PIN โชว์ครั้งเดียว |
+| POST | `/api/support/contact` | public เปิดเคส (rate limit ip/device + captcha stub) — token โชว์ครั้งเดียว |
+| GET | `/api/support/cases/:id?token=` | ติดตามเคสด้วย token (IP อย่างเดียวเปิดไม่ได้) |
+| POST | `/api/support/cases/:id/messages` | ผู้แจ้งตอบเพิ่มผ่าน token |
+| GET | `/api/admin/support/cases` | Admin: list/filter เคส |
+| GET/PATCH | `/api/admin/support/cases/:id` | Admin: รายละเอียด + สถานะ/priority/assign |
+| POST | `/api/admin/support/cases/:id/claim` | รับเคส (กันรับซ้ำ) |
+| POST | `/api/admin/support/cases/:id/messages` | ตอบผู้แจ้ง (PUBLIC) / โน้ตภายใน (INTERNAL) |
+| GET/POST | `/api/support/conversations` | user get-or-create ห้องแชทของตัวเอง (1 user = 1 ห้อง) |
+| GET/POST | `/api/support/conversations/:id/messages` | user อ่าน/ส่ง (INTERNAL ถูกซ่อน, admin = 「เจ้าหน้าที่」) |
+| GET | `/api/admin/inbox` | Admin: ทุก conversation + unread |
+| GET/POST | `/api/admin/inbox/:id/messages` | Admin: อ่าน (รวม INTERNAL + ชื่อจริง) / ตอบ |
+| GET | `/api/admin/logs/audit` | Admin: audit log (filter action/actor/outcome/ช่วงเวลา) |
+| GET | `/api/admin/logs/system` | Admin: system log (filter level/source/code) |
+| POST | `/api/admin/logs/export` | Admin: export CSV/JSON (audit การ export ด้วย) |
 
 ---
 

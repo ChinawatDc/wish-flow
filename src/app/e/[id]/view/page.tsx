@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { StepRenderer } from "@/components/steps/StepRenderer";
-import type { StepsSchema } from "@/lib/validation";
+import type { StepDef, StepsSchema } from "@/lib/validation";
 
 type ViewPayload = {
   name: string;
@@ -14,11 +14,20 @@ type ViewPayload = {
   assets?: { id: string; url: string }[];
 };
 
+function detectDeviceClass(): "MOBILE" | "TABLET" | "DESKTOP" | "UNKNOWN" {
+  if (typeof window === "undefined") return "UNKNOWN";
+  const w = window.innerWidth;
+  if (w < 768) return "MOBILE";
+  if (w < 1024) return "TABLET";
+  return "DESKTOP";
+}
+
 export default function GuestViewPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const [data, setData] = useState<ViewPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const sent = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +45,25 @@ export default function GuestViewPage() {
       cancelled = true;
     };
   }, [id]);
+
+  function track(payload: {
+    kind: "STEP_START" | "STEP_COMPLETE" | "STEP_SKIP" | "FLOW_COMPLETE";
+    stepKey?: string;
+    stepType?: string;
+    stepIndex?: number;
+  }) {
+    const key = `${payload.kind}:${payload.stepKey ?? ""}:${payload.stepIndex ?? ""}`;
+    if (sent.current.has(key)) return;
+    sent.current.add(key);
+    void fetch(`/api/e/${id}/telemetry`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...payload,
+        deviceClass: detectDeviceClass(),
+      }),
+    });
+  }
 
   if (error) {
     return (
@@ -73,6 +101,16 @@ export default function GuestViewPage() {
             steps={data.template.stepsSchema.steps}
             data={data.templateData}
             assets={data.assets ?? []}
+            onStepChange={(index, step: StepDef | undefined) => {
+              if (!step) return;
+              track({
+                kind: "STEP_START",
+                stepKey: step.key,
+                stepType: step.type,
+                stepIndex: index,
+              });
+            }}
+            onComplete={() => track({ kind: "FLOW_COMPLETE" })}
           />
         </div>
       </div>

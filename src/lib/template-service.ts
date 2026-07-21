@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { prisma } from "@/lib/db";
+import { GAME_STEP_TYPES } from "@/lib/step-registry";
 
 export const TEMPLATE_CATEGORIES = [
   "birthday",
@@ -35,16 +36,6 @@ export const templateQuerySchema = z.object({
 
 export type TemplateQuery = z.infer<typeof templateQuerySchema>;
 
-const GAME_STEP_TYPES = [
-  "tap-the-balloon",
-  "catch-the-heart",
-  "memory-match",
-  "birthday-quiz",
-  "spin-the-wheel",
-  "find-the-gift",
-  "confetti-pop",
-];
-
 export function templateHasGame(stepsSchema: unknown): boolean {
   const steps = (stepsSchema as { steps?: { type: string }[] })?.steps ?? [];
   return steps.some((s) => GAME_STEP_TYPES.includes(s.type));
@@ -53,6 +44,8 @@ export function templateHasGame(stepsSchema: unknown): boolean {
 export async function searchTemplates(query: TemplateQuery) {
   const where = {
     isActive: true,
+    currentPublishedVersionId: { not: null as string | null },
+    marketplaceVisibility: "PUBLIC" as const,
     ...(query.category ? { category: query.category } : {}),
     ...(query.mood ? { mood: query.mood } : {}),
     ...(query.premium ? { isPremium: query.premium === "true" } : {}),
@@ -81,27 +74,36 @@ export async function searchTemplates(query: TemplateQuery) {
       orderBy,
       skip: (query.page - 1) * query.limit,
       take: query.limit,
+      include: { currentPublishedVersion: true },
     }),
   ]);
 
-  // hasGame filter ทำหลัง query (step types อยู่ใน JSONB)
-  let items = rows.map((t) => ({
-    id: t.id,
-    slug: t.slug,
-    name: t.name,
-    description: t.description,
-    thumbnailUrl: t.thumbnailUrl,
-    category: t.category,
-    tags: t.tags,
-    mood: t.mood,
-    requiredAssetCount: t.requiredAssetCount,
-    isPremium: t.isPremium,
-    usageCount: t.usageCount,
-    stepsSchema: t.stepsSchema,
-    hasGame: templateHasGame(t.stepsSchema),
-    stepCount:
-      ((t.stepsSchema as { steps?: unknown[] })?.steps ?? []).length,
-  }));
+  let items = rows.map((t) => {
+    const schema = t.currentPublishedVersion?.stepsSchema ?? t.stepsSchema;
+    return {
+      id: t.id,
+      slug: t.slug,
+      name: t.name,
+      description: t.description,
+      thumbnailUrl: t.thumbnailUrl,
+      category: t.category,
+      tags: t.tags,
+      mood: t.mood,
+      requiredAssetCount: t.requiredAssetCount,
+      isPremium: t.isPremium,
+      isFeatured: t.isFeatured,
+      usageCount: t.usageCount,
+      stepsSchema: schema,
+      currentVersion: t.currentPublishedVersion
+        ? {
+            id: t.currentPublishedVersion.id,
+            version: t.currentPublishedVersion.version,
+          }
+        : null,
+      hasGame: templateHasGame(schema),
+      stepCount: ((schema as { steps?: unknown[] })?.steps ?? []).length,
+    };
+  });
 
   if (query.hasGame) {
     const want = query.hasGame === "true";
@@ -119,7 +121,12 @@ export async function searchTemplates(query: TemplateQuery) {
 
 export async function getTemplateBySlug(slug: string) {
   return prisma.template.findFirst({
-    where: { slug, isActive: true },
+    where: {
+      slug,
+      isActive: true,
+      currentPublishedVersionId: { not: null },
+    },
+    include: { currentPublishedVersion: true },
   });
 }
 

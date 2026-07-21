@@ -8,7 +8,8 @@ import path from "path";
 export interface StorageAdapter {
   /** เก็บไฟล์ คืน public URL path */
   save(params: {
-    eventId: string;
+    eventId?: string;
+    templateId?: string;
     filename: string;
     buffer: Buffer;
   }): Promise<string>;
@@ -31,17 +32,22 @@ function urlToSafePath(url: string): string | null {
 class LocalStorageAdapter implements StorageAdapter {
   async save({
     eventId,
+    templateId,
     filename,
     buffer,
   }: {
-    eventId: string;
+    eventId?: string;
+    templateId?: string;
     filename: string;
     buffer: Buffer;
   }): Promise<string> {
-    const dir = path.join(UPLOAD_ROOT, "events", eventId);
+    const ownerType = templateId ? "templates" : "events";
+    const ownerId = templateId ?? eventId;
+    if (!ownerId) throw new Error("storage_owner_required");
+    const dir = path.join(UPLOAD_ROOT, ownerType, ownerId);
     await mkdir(dir, { recursive: true });
     await writeFile(path.join(dir, filename), buffer);
-    return `${URL_PREFIX}/events/${eventId}/${filename}`;
+    return `${URL_PREFIX}/${ownerType}/${ownerId}/${filename}`;
   }
 
   async delete(url: string): Promise<void> {

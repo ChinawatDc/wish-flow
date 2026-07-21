@@ -7,11 +7,9 @@ import {
   validateUpload,
 } from "@/lib/upload-validation";
 
-async function findOwnedEvent(deviceToken: string, eventId: string) {
-  const creator = await prisma.creator.findUnique({ where: { deviceToken } });
-  if (!creator) return null;
+async function findOwnedEvent(userId: string, eventId: string) {
   return prisma.event.findFirst({
-    where: { id: eventId, creatorId: creator.id },
+    where: { id: eventId, ownerUserId: userId },
   });
 }
 
@@ -28,13 +26,13 @@ export type UploadAssetResult =
   | { ok: false; status: 401 | 404 | 400 | 409; reason: string };
 
 export async function uploadAsset(params: {
-  deviceToken: string;
+  userId: string;
   eventId: string;
   buffer: Buffer;
   declaredMime: string;
   originalName: string;
 }): Promise<UploadAssetResult> {
-  const event = await findOwnedEvent(params.deviceToken, params.eventId);
+  const event = await findOwnedEvent(params.userId, params.eventId);
   if (!event) return { ok: false, status: 404, reason: "ไม่พบอีเวนต์นี้" };
 
   const count = await prisma.eventAsset.count({ where: { eventId: event.id } });
@@ -78,11 +76,11 @@ export async function uploadAsset(params: {
 }
 
 export async function deleteAsset(params: {
-  deviceToken: string;
+  userId: string;
   eventId: string;
   assetId: string;
 }): Promise<{ ok: true } | { ok: false; status: 404; reason: string }> {
-  const event = await findOwnedEvent(params.deviceToken, params.eventId);
+  const event = await findOwnedEvent(params.userId, params.eventId);
   if (!event) return { ok: false, status: 404, reason: "ไม่พบอีเวนต์นี้" };
 
   const asset = await prisma.eventAsset.findFirst({
@@ -93,7 +91,6 @@ export async function deleteAsset(params: {
   await storage.delete(asset.url);
   await prisma.eventAsset.delete({ where: { id: asset.id } });
 
-  // reindex sort order
   const rest = await prisma.eventAsset.findMany({
     where: { eventId: event.id },
     orderBy: { sortOrder: "asc" },
@@ -109,11 +106,11 @@ export async function deleteAsset(params: {
 }
 
 export async function reorderAssets(params: {
-  deviceToken: string;
+  userId: string;
   eventId: string;
   orderedIds: string[];
 }): Promise<{ ok: true } | { ok: false; status: 404 | 400; reason: string }> {
-  const event = await findOwnedEvent(params.deviceToken, params.eventId);
+  const event = await findOwnedEvent(params.userId, params.eventId);
   if (!event) return { ok: false, status: 404, reason: "ไม่พบอีเวนต์นี้" };
 
   const assets = await prisma.eventAsset.findMany({
@@ -136,7 +133,6 @@ export async function reorderAssets(params: {
   return { ok: true };
 }
 
-/** ลบไฟล์ storage ทั้งหมดของ event (เรียกก่อนลบ event) */
 export async function deleteAllAssetFiles(eventId: string) {
   const assets = await prisma.eventAsset.findMany({
     where: { eventId },

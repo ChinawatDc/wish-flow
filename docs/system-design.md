@@ -155,6 +155,12 @@ CREATE TABLE event_assets (
 );
 ```
 
+> **อัปเดต (implemented):** schema จริงขยายจากด้านบนแล้ว —
+> - `users` + `accounts` (Auth.js): role `USER`/`ADMIN`, status `ACTIVE`/`SUSPENDED`; `events.owner_user_id` เป็น ownership หลัก ส่วน `creators.device_token` เหลือไว้เพื่อ claim การ์ด legacy ครั้งเดียวหลัง login
+> - `template_versions`: published snapshot immutable (Draft/Published/Deprecated/Archived) + `events.template_version_id` pin — publish version ใหม่ไม่กระทบ event เดิม
+> - `template_assets`, `template_telemetry_events` (guest funnel หลัง unlock, เก็บ device class ไม่เก็บ raw UA/IP)
+> ดู `prisma/schema.prisma` และ `docs/adr.md` ADR-4/ADR-5
+
 **ทำไมออกแบบแบบนี้ (เผื่อระบบใหญ่):**
 - `templates.steps_schema` เป็น JSONB → เพิ่ม template ใหม่ = insert row ใหม่ ไม่ต้อง migrate table
 - `events.template_data` เป็น JSONB → แต่ละ template เก็บข้อมูลรูปแบบต่างกันได้โดยไม่ต้องมี column เผื่อทุกแบบ

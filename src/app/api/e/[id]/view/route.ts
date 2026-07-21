@@ -4,7 +4,7 @@ import { unlockCookieName } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { jsonError, jsonOk } from "@/lib/http";
 import { sanitizeTemplateData } from "@/lib/sanitize";
-import { parseStepsSchema } from "@/lib/validation";
+import { resolveEventStepsSchema } from "@/lib/template-studio-service";
 import { verifyUnlockToken } from "@/lib/unlock-token";
 
 type Params = { params: Promise<{ id: string }> };
@@ -22,6 +22,7 @@ export async function GET(_request: Request, { params }: Params) {
     where: { id },
     include: {
       template: true,
+      templateVersion: true,
       assets: {
         orderBy: { sortOrder: "asc" },
         select: { id: true, url: true },
@@ -32,11 +33,25 @@ export async function GET(_request: Request, { params }: Params) {
     return jsonError("ไม่พบอีเวนต์นี้", 404);
   }
 
-  if (!event.template) {
+  if (!event.template && !event.templateVersion) {
     return jsonError("อีเวนต์นี้ยังไม่ได้เลือกเทมเพลต", 400);
   }
 
-  const stepsSchema = parseStepsSchema(event.template.stepsSchema);
+  let stepsSchema;
+  try {
+    stepsSchema = resolveEventStepsSchema(event);
+  } catch {
+    return jsonError("เทมเพลตเสียหาย", 500);
+  }
+  if (!stepsSchema) {
+    return jsonError("อีเวนต์นี้ยังไม่ได้เลือกเทมเพลต", 400);
+  }
+
+  const enabledSteps = {
+    ...stepsSchema,
+    steps: stepsSchema.steps.filter((s) => s.enabled !== false),
+  };
+
   const templateData = sanitizeTemplateData(
     (event.templateData ?? {}) as Record<string, unknown>,
   );
@@ -45,10 +60,13 @@ export async function GET(_request: Request, { params }: Params) {
     id: event.id,
     name: event.name,
     eventDate: event.eventDate?.toISOString().slice(0, 10) ?? null,
+    templateVersionId: event.templateVersionId,
     template: {
-      slug: event.template.slug,
-      name: event.template.name,
-      stepsSchema,
+      slug: event.template?.slug ?? "unknown",
+      name: event.template?.name ?? "Template",
+      version: event.templateVersion?.version ?? null,
+      stepsSchema: enabledSteps,
+      settings: event.templateVersion?.settings ?? {},
     },
     templateData,
     assets: event.assets,
