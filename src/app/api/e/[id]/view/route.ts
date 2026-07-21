@@ -1,0 +1,56 @@
+import { cookies } from "next/headers";
+
+import { unlockCookieName } from "@/lib/constants";
+import { prisma } from "@/lib/db";
+import { jsonError, jsonOk } from "@/lib/http";
+import { sanitizeTemplateData } from "@/lib/sanitize";
+import { parseStepsSchema } from "@/lib/validation";
+import { verifyUnlockToken } from "@/lib/unlock-token";
+
+type Params = { params: Promise<{ id: string }> };
+
+export async function GET(_request: Request, { params }: Params) {
+  const { id } = await params;
+  const jar = await cookies();
+  const token = jar.get(unlockCookieName(id))?.value;
+  if (!token) return jsonError("กรุณากรอก PIN ก่อนเข้าชม", 401);
+
+  const valid = await verifyUnlockToken(token, id);
+  if (!valid) return jsonError("เซสชันหมดอายุ กรุณากรอก PIN ใหม่", 401);
+
+  const event = await prisma.event.findUnique({
+    where: { id },
+    include: {
+      template: true,
+      assets: {
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, url: true },
+      },
+    },
+  });
+  if (!event || event.status !== "active") {
+    return jsonError("ไม่พบอีเวนต์นี้", 404);
+  }
+
+  if (!event.template) {
+    return jsonError("อีเวนต์นี้ยังไม่ได้เลือกเทมเพลต", 400);
+  }
+
+  const stepsSchema = parseStepsSchema(event.template.stepsSchema);
+  const templateData = sanitizeTemplateData(
+    (event.templateData ?? {}) as Record<string, unknown>,
+  );
+
+  return jsonOk({
+    id: event.id,
+    name: event.name,
+    eventDate: event.eventDate?.toISOString().slice(0, 10) ?? null,
+    template: {
+      slug: event.template.slug,
+      name: event.template.name,
+      stepsSchema,
+    },
+    templateData,
+    assets: event.assets,
+  });
+}

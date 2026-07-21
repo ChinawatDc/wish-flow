@@ -1,0 +1,14 @@
+---
+description: Wish-Flow agent must follow goal/flow/AGENTS docs
+alwaysApply: true
+---
+
+# Wish-Flow
+
+Before implementing, read `AGENTS.md`, `goal.md`, `flow.md`, and `docs/system-design.md`.
+
+- Focus is G1 MVP until done criteria pass
+- Follow `flow.md` implementation order
+- Use Docker Compose Postgres on port 5435
+- Mobile-first UI; PIN never plain text
+- Update `goal.md` evidence when finishing a work round

@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wishflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wish_flow
+      POSTGRES_USER: wishflow
+      POSTGRES_PASSWORD: wishflow
+    ports:
+      - "5435:5432"
+    volumes:
+      - wishflow_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wishflow -d wish_flow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  wishflow_pgdata:

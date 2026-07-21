@@ -1,0 +1,13 @@
+/node_modules
+/.next
+/out
+/build
+*.log
+.env
+.env*.local
+!.env.example
+*.tsbuildinfo
+next-env.d.ts
+
+# uploaded event assets (local storage adapter)
+/uploads
