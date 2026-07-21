@@ -2,9 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Mali } from "next/font/google";
 import type { ReactNode } from "react";
 
-import { AdminSecurityPinModal } from "@/components/AdminSecurityPinModal";
-import { AppNav } from "@/components/AppNav";
-import { ClaimOnLogin } from "@/components/ClaimOnLogin";
+import { AppChrome } from "@/components/AppChrome";
 import { Providers } from "@/components/Providers";
 
 import "./globals.css";
@@ -31,10 +29,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="th">
       <body className={mali.className}>
         <Providers>
-          <AppNav />
-          <ClaimOnLogin />
-          <AdminSecurityPinModal />
-          {children}
+          <AppChrome>{children}</AppChrome>
         </Providers>
       </body>
     </html>

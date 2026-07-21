@@ -122,9 +122,8 @@ describe.runIf(hasDb)("event-service integration (Postgres + User ownership)", (
       },
     });
     expect("event" in result).toBe(true);
-    if ("event" in result) {
-      expect(result.event.name).toBe("Updated Birthday");
-    }
+    if (!("event" in result) || !result.event) return;
+    expect(result.event.name).toBe("Updated Birthday");
   });
 
   it("rejects update from another user", async () => {
@@ -188,9 +187,10 @@ describe.runIf(hasDb)("event-service integration (Postgres + User ownership)", (
     const oldPin = target.pin;
     const regen = await regenerateOwnedPin(userId, target.event.id);
     expect("pin" in regen).toBe(true);
-    if (!("pin" in regen)) return;
+    if (!("pin" in regen) || typeof regen.pin !== "string") return;
+    const newPin = regen.pin;
 
-    if (regen.pin !== oldPin) {
+    if (newPin !== oldPin) {
       const oldTry = await verifyEventPin({
         eventId: target.event.id,
         pin: oldPin,
@@ -201,7 +201,7 @@ describe.runIf(hasDb)("event-service integration (Postgres + User ownership)", (
 
     const newTry = await verifyEventPin({
       eventId: target.event.id,
-      pin: regen.pin,
+      pin: newPin,
       ipAddress: "10.0.0.10",
     });
     expect(newTry.ok).toBe(true);

@@ -151,7 +151,7 @@ describe.runIf(hasDb)("auth-service: register, claim, admin guards", () => {
       name: "Tester",
     });
     expect("user" in result).toBe(true);
-    if (!("user" in result)) return;
+    if (!("user" in result) || !result.user) return;
     ids.push(result.user.id);
 
     const db = await prisma.user.findUniqueOrThrow({ where: { id: result.user.id } });
@@ -163,7 +163,7 @@ describe.runIf(hasDb)("auth-service: register, claim, admin guards", () => {
   it("register อีเมลซ้ำไม่ได้", async () => {
     const email = `dup-${randomUUID()}@test.local`;
     const first = await registerUser({ email, password: "password123" });
-    if ("user" in first) ids.push(first.user.id);
+    if ("user" in first && first.user) ids.push(first.user.id);
     const second = await registerUser({ email, password: "password123" });
     expect(second).toEqual({ error: "email_taken" });
   });
