@@ -118,3 +118,5 @@ _(ว่าง)_
 - [x] 2026-07-21 — Project init (docs, Docker, Prisma, pin tests)
 - [x] 2026-07-21 — **G1 MVP end-to-end** (API + UI + tests + build)
 - [x] 2026-07-21 — **Phase 2 Enhancement** (ปฏิทิน พ.ศ. + อัปโหลดรูป + Template Explorer + 21 step types + 13 templates + edit page ใหม่ + draft/duplicate/expiry — 62 tests ผ่าน)
+- [x] 2026-07-21 — **Template Studio IA Spec** (`docs/template-studio-ia.md`: โครงหน้าจอ, ตั้งค่าย่อย Basic/Pro/Expert, role permission, versioning/publish gate, analytics, rollout milestones)
+- [x] 2026-07-21 — **Expansion Roadmap** (`docs/expansion-roadmap.md`: ขยายจาก HBD สู่ Personal Micro-site Generator, จัดลำดับ Track A-E, แนะนำ Time Capsule เป็น M1, ระบุผลกระทบ UX/API/Domain + milestones + metrics)
