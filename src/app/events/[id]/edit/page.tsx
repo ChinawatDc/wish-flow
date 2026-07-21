@@ -35,6 +35,8 @@ type EventDetail = {
   templateId: string | null;
   templateData: Record<string, unknown>;
   status: string;
+  guestAccessMode: "PIN" | "PUBLIC";
+  guestbookEnabled: boolean;
   viewCount: number;
   assets: UploadedAsset[];
   stats: { unlockSuccess: number; unlockFail: number };
@@ -68,6 +70,9 @@ const FIELD_LABELS: Record<string, string> = {
   timeline_caption: "หัวข้อไทม์ไลน์ 🛤️",
   scratch_caption: "ข้อความชวนขูด ✨",
   puzzle_caption: "ข้อความชวนต่อจิ๊กซอว์ 🧩",
+  guestbook_cta_title: "หัวข้อชวนเขียนสมุดอวยพร",
+  guestbook_cta_body: "ข้อความชวนแขกเขียนคำอวยพร",
+  guestbook_cta_button: "ข้อความปุ่มไปสมุดอวยพร",
 };
 
 function isLongField(key: string) {
@@ -127,6 +132,8 @@ export default function EditEventPage() {
   const [templateData, setTemplateData] = useState<Record<string, string>>({});
   const [assets, setAssets] = useState<UploadedAsset[]>([]);
   const [status, setStatus] = useState("active");
+  const [guestbookEnabled, setGuestbookEnabled] = useState(false);
+  const [guestAccessMode, setGuestAccessMode] = useState<"PIN" | "PUBLIC">("PIN");
   const [error, setError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"saved" | "dirty" | "saving">("saved");
   const [explorerOpen, setExplorerOpen] = useState(false);
@@ -160,6 +167,8 @@ export default function EditEventPage() {
       setTemplateId(data.templateId ?? "");
       setTemplateInfo(data.template);
       setStatus(data.status);
+      setGuestbookEnabled(Boolean(data.guestbookEnabled));
+      setGuestAccessMode(data.guestAccessMode === "PUBLIC" ? "PUBLIC" : "PIN");
       setAssets(data.assets ?? []);
       const td = (data.templateData ?? {}) as Record<string, unknown>;
       const asStrings: Record<string, string> = {};
@@ -185,6 +194,8 @@ export default function EditEventPage() {
           templateId: templateId || null,
           templateData,
           status,
+          guestbookEnabled,
+          guestAccessMode,
         }),
       });
       const data = await res.json();
@@ -196,7 +207,17 @@ export default function EditEventPage() {
       setSaveState("dirty");
       return false;
     }
-  }, [id, name, eventDate, expiresAt, templateId, templateData, status]);
+  }, [
+    id,
+    name,
+    eventDate,
+    expiresAt,
+    templateId,
+    templateData,
+    status,
+    guestbookEnabled,
+    guestAccessMode,
+  ]);
 
   // autosave (debounce 2s หลังแก้)
   useEffect(() => {
@@ -207,7 +228,16 @@ export default function EditEventPage() {
     }, 2000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, eventDate, expiresAt, templateId, templateData, status]);
+  }, [
+    name,
+    eventDate,
+    expiresAt,
+    templateId,
+    templateData,
+    status,
+    guestbookEnabled,
+    guestAccessMode,
+  ]);
 
   // เตือนถ้าออกจากหน้าโดยยังไม่บันทึก
   useEffect(() => {
@@ -388,6 +418,70 @@ export default function EditEventPage() {
                   ไม่สำเร็จ {event.stats.unlockFail}
                 </p>
               )}
+              <div className="rounded-2xl border-2 border-rose-50 bg-rose-50/40 px-4 py-3 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-rose-800">เปิดสมุดอวยพร</p>
+                    <p className="text-xs text-rose-400">
+                      แขกส่งคำอวยพรได้ — ต้องอนุมัติก่อนขึ้นกำแพง
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={guestbookEnabled}
+                    onClick={() => setGuestbookEnabled((v) => !v)}
+                    className={`relative h-8 w-14 shrink-0 rounded-full transition ${
+                      guestbookEnabled ? "bg-emerald-400" : "bg-rose-200"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${
+                        guestbookEnabled ? "left-7" : "left-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-rose-800">
+                      เปิดสาธารณะ ไม่ใช้ PIN
+                    </p>
+                    <p className="text-xs text-rose-400">
+                      ใครมีลิงก์/QR เข้าสมุดอวยพรได้เลย — ระวังสแปม
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={guestAccessMode === "PUBLIC"}
+                    onClick={() =>
+                      setGuestAccessMode((m) => (m === "PUBLIC" ? "PIN" : "PUBLIC"))
+                    }
+                    className={`relative h-8 w-14 shrink-0 rounded-full transition ${
+                      guestAccessMode === "PUBLIC" ? "bg-amber-400" : "bg-rose-200"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${
+                        guestAccessMode === "PUBLIC" ? "left-7" : "left-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+                {guestAccessMode === "PUBLIC" && (
+                  <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    โหมดสาธารณะ: ลิงก์การ์ดไม่ต้องใช้ PIN — ควรเปิดสมุดอวยพรและตรวจ moderation
+                    เป็นประจำ
+                  </p>
+                )}
+                <Link
+                  href={`/events/${id}/wishes`}
+                  className="inline-flex text-sm font-semibold text-rose-600 hover:underline"
+                >
+                  ไปคิวอนุมัติคำอวยพร →
+                </Link>
+              </div>
             </div>
           </SectionCard>
 
@@ -521,6 +615,7 @@ export default function EditEventPage() {
                 steps={templateInfo.stepsSchema.steps}
                 data={templateData}
                 assets={assets}
+                previewMode
               />
             </div>
           </div>

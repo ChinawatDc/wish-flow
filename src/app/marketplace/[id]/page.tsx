@@ -161,6 +161,7 @@ export default function MarketplaceDetailPage() {
                 steps={steps as never}
                 data={card.revision.templateData}
                 assets={card.revision.assets}
+                previewMode
               />
             </div>
           ) : (

@@ -1,5 +1,5 @@
 /**
- * Audit cleanup: ลบไฟล์ใน uploads/ ที่ไม่มี record ใน event_assets แล้ว (orphan)
+ * Audit cleanup: ลบไฟล์ใน uploads/ ที่ไม่มี record ใน event_assets / guestbook_entries
  * รัน: npx tsx scripts/cleanup-orphan-assets.ts [--dry-run]
  */
 import { readdir, unlink } from "fs/promises";
@@ -11,27 +11,29 @@ const prisma = new PrismaClient();
 const UPLOAD_ROOT = path.resolve(process.cwd(), "uploads");
 const dryRun = process.argv.includes("--dry-run");
 
-async function main() {
-  const assets = await prisma.eventAsset.findMany({ select: { url: true } });
-  const known = new Set(
-    assets.map((a) => a.url.replace(/^\/api\/uploads\//, "")),
-  );
-
-  const eventsDir = path.join(UPLOAD_ROOT, "events");
-  let eventDirs: string[] = [];
+async function sweepDir(
+  subdir: string,
+  known: Set<string>,
+): Promise<number> {
+  const root = path.join(UPLOAD_ROOT, subdir);
+  let ownerDirs: string[] = [];
   try {
-    eventDirs = await readdir(eventsDir);
+    ownerDirs = await readdir(root);
   } catch {
-    console.log("ไม่มีโฟลเดอร์ uploads/events — ไม่มีอะไรให้ล้าง");
-    return;
+    return 0;
   }
 
   let removed = 0;
-  for (const eventId of eventDirs) {
-    const dir = path.join(eventsDir, eventId);
-    const files = await readdir(dir);
+  for (const ownerId of ownerDirs) {
+    const dir = path.join(root, ownerId);
+    let files: string[] = [];
+    try {
+      files = await readdir(dir);
+    } catch {
+      continue;
+    }
     for (const file of files) {
-      const rel = `events/${eventId}/${file}`;
+      const rel = `${subdir}/${ownerId}/${file}`;
       if (!known.has(rel)) {
         console.log(`${dryRun ? "[dry-run] " : ""}orphan: ${rel}`);
         if (!dryRun) await unlink(path.join(dir, file));
@@ -39,6 +41,27 @@ async function main() {
       }
     }
   }
+  return removed;
+}
+
+async function main() {
+  const [assets, guestbook] = await Promise.all([
+    prisma.eventAsset.findMany({ select: { url: true } }),
+    prisma.guestbookEntry.findMany({
+      where: { photoUrl: { not: null } },
+      select: { photoUrl: true },
+    }),
+  ]);
+
+  const known = new Set(
+    [...assets.map((a) => a.url), ...guestbook.map((g) => g.photoUrl!)]
+      .map((u) => u.replace(/^\/api\/uploads\//, "")),
+  );
+
+  const removedEvents = await sweepDir("events", known);
+  const removedGuestbook = await sweepDir("guestbook", known);
+  const removed = removedEvents + removedGuestbook;
+
   console.log(
     `${dryRun ? "พบ" : "ลบ"} orphan ${removed} ไฟล์ (DB มี ${known.size} รูป)`,
   );

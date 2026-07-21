@@ -883,6 +883,7 @@ export function TemplateStudioBuilder({ template, initialDraft, versionLabel }: 
                   data={samplePreview}
                   assets={[]}
                   initialIndex={previewIndex}
+                  previewMode
                 />
               </div>
             )}
@@ -915,6 +916,7 @@ export function TemplateStudioBuilder({ template, initialDraft, versionLabel }: 
                 data={samplePreview}
                 assets={[]}
                 initialIndex={previewIndex}
+                previewMode
               />
             </div>
           </div>

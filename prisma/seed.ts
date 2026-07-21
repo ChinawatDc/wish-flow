@@ -239,6 +239,28 @@ const TEMPLATES: TemplateSeed[] = [
       { key: "finale", type: "final-celebration", fields: ["final_message", "sender_name"], section: "finale" },
     ],
   },
+  {
+    slug: "wedding-guestbook",
+    name: "งานแต่ง + สมุดอวยพร 💍",
+    description: "เปิดซอง → คำอวยพร → ชวนเขียนสมุดอวยพร → ฉลองปิดท้าย (เหมาะโหมดสาธารณะ)",
+    thumbnail: "emoji:💍",
+    category: "romantic",
+    tags: ["งานแต่ง", "สมุดอวยพร", "สาธารณะ", "โรแมนติก"],
+    mood: "romantic",
+    requiredAssetCount: 0,
+    sortOrder: 14,
+    steps: [
+      { key: "letter", type: "envelope-open", fields: ["envelope_message", "sender_name"], section: "opening" },
+      { key: "message", type: "text-reveal", fields: ["message_text", "sender_name"], section: "body" },
+      {
+        key: "guestbook",
+        type: "guestbook-cta",
+        fields: ["guestbook_cta_title", "guestbook_cta_body", "guestbook_cta_button"],
+        section: "body",
+      },
+      { key: "finale", type: "final-celebration", fields: ["final_message"], section: "finale" },
+    ],
+  },
 ];
 
 function buildStepsSchema(steps: TemplateSeed["steps"]) {

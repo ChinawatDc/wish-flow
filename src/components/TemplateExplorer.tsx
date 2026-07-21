@@ -404,6 +404,7 @@ export function TemplateExplorer({ open, onClose, currentSlug, onSelect }: Props
                     steps={preview.stepsSchema.steps}
                     data={preview.templateData}
                     assets={[]}
+                    previewMode
                   />
                 </div>
                 <div className="border-t-2 border-rose-100 p-3">

@@ -61,6 +61,24 @@ export const updateEventSchema = z.object({
   templateId: z.string().uuid().nullable().optional(),
   templateData: z.record(z.string(), z.unknown()).optional(),
   status: z.enum(["draft", "active", "archived", "expired"]).optional(),
+  guestAccessMode: z.enum(["PIN", "PUBLIC"]).optional(),
+  guestbookEnabled: z.boolean().optional(),
+});
+
+export const guestbookSubmitSchema = z.object({
+  displayName: z.string().trim().max(80).optional().nullable(),
+  message: z.string().trim().min(1).max(1000),
+  captchaToken: z.string().trim().max(2048).optional().nullable(),
+});
+
+export const guestbookModerateSchema = z.object({
+  status: z.enum(["APPROVED", "HIDDEN", "REJECTED"]),
+  rejectReason: z.string().trim().max(200).optional().nullable(),
+});
+
+export const guestbookBulkSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(50),
+  status: z.enum(["APPROVED", "HIDDEN", "REJECTED"]),
 });
 
 export const verifyPinSchema = z.object({

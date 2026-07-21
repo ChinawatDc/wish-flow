@@ -158,6 +158,9 @@ export const SAMPLE_TEMPLATE_DATA: Record<string, string> = {
   timeline_caption: "เส้นทางของเรา",
   scratch_caption: "ขูดตรงนี้เลย!",
   puzzle_caption: "ต่อรูปให้ครบสิ!",
+  guestbook_cta_title: "เขียนคำอวยพรให้เราหน่อยนะ",
+  guestbook_cta_body: "ชื่อและรูปเป็นทางเลือก — ข้อความจะขึ้นกำแพงหลังเจ้าของอนุมัติ",
+  guestbook_cta_button: "ไปสมุดอวยพร",
 };
 
 export const SAMPLE_ASSETS = [

@@ -119,3 +119,15 @@ tar xzf uploads-backup-YYYYMMDD.tar.gz
 6. Guest expiry เป็น hard gate บน verify-pin / view / telemetry + UI overlay
 
 **เหตุผล:** ลดการรั่วรูปส่วนตัวโดยไม่ตั้งใจ, คงประวัติเวอร์ชันที่คนอื่นดาวน์โหลด, และไม่ผสม ownership กับการ์ด PIN ของเจ้าของ
+
+## ADR-8: Wedding Guestbook + Public QR + private R2 photos
+
+**ตัดสินใจ:**
+1. `Event.guestAccessMode` = `PIN` (default, backward compatible) | `PUBLIC` — การ์ดเดิมทั้งหมดคง PIN; `pinHash` ยัง non-null แต่ไม่ใช้ใน PUBLIC
+2. Guestbook เป็นข้อมูลสดของ Event เท่านั้น (`guestbook_entries`) — duplicate / Card Marketplace / CardRevision **ห้าม** คัดลอกคำอวยพรหรือรูปแขก
+3. รูปแขกเก็บผ่าน `StorageAdapter` ด้วย prefix `guestbook/<eventId>/<uuid>` — Cloudflare R2 เมื่อตั้ง `R2_*`; local disk ใน dev; **ไม่คืน public R2 URL**
+4. อ่านรูปได้เฉพาะ owner (ทุกสถานะ) หรือ public เมื่อ entry = `APPROVED` ผ่าน ACL proxy — `/api/uploads/guestbook/*` ถูกบล็อกตรง
+5. Submit ผ่าน multipart + CAPTCHA adapter + rate limit 5/ชม. ต่อ event+ipHash/device; moderation โดยเจ้าของเท่านั้น (Admin read-only ตามกฎเดิม)
+6. Template step `guestbook-cta` เป็น lego ทั่วไป; seed `wedding-guestbook` ตาม ADR-5 (ไม่ทับ published schema)
+
+**เหตุผล:** รองรับงานแต่ง/อีเวนต์ที่ต้องการ QR สาธารณะโดยไม่ลดความปลอดภัยของ PIN cards และแยก privacy ของรูปแขกออกจาก event assets

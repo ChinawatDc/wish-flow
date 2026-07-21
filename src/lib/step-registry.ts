@@ -190,6 +190,18 @@ export const STEP_TYPE_META: StepTypeMeta[] = [
     defaultFields: ["confetti_message"],
     capabilities: ["transition", "timing", "motion", "minigame", "fallback"],
   },
+  {
+    type: "guestbook-cta",
+    group: "text",
+    labelTh: "ชวนเขียนสมุดอวยพร",
+    labelEn: "Guestbook CTA",
+    defaultFields: [
+      "guestbook_cta_title",
+      "guestbook_cta_body",
+      "guestbook_cta_button",
+    ],
+    capabilities: ["transition", "timing"],
+  },
 ];
 
 export const KNOWN_STEP_TYPES = STEP_TYPE_META.map((s) => s.type);

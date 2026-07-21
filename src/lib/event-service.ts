@@ -57,6 +57,8 @@ export async function updateOwnedEvent(params: {
     status?: string;
     templateId?: string | null;
     templateData?: Record<string, unknown>;
+    guestAccessMode?: "PIN" | "PUBLIC";
+    guestbookEnabled?: boolean;
   };
 }) {
   const existing = await findOwnedByUser(params.userId, params.eventId);

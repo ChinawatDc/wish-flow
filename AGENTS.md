@@ -28,8 +28,11 @@ Phase 1 MVP ตาม `goal.md` G1: create → PIN/QR → guest unlock → templ
 - เปลี่ยน/รีเซ็ตรหัสผ่านหรือ PIN → bump `authVersion` เสมอ (invalidate JWT เก่า)
 - Creator mutation ต้องใช้ session ผู้ใช้ที่ login แล้ว และ `ownerUserId` ตรงกับ session — ห้ามเชื่อ user id จาก body
 - Admin **ห้าม** mutate การ์ดของ user คนอื่น (ดูได้อย่างเดียวผ่าน `/api/admin/events*`)
-- ห้ามเก็บรูป base64/binary ใน Postgres — ผ่าน `StorageAdapter` (`src/lib/storage.ts`) เท่านั้น, metadata ใน `event_assets`
+- ห้ามเก็บรูป base64/binary ใน Postgres — ผ่าน `StorageAdapter` (`src/lib/storage.ts`) เท่านั้น, metadata ใน `event_assets` / `guestbook_entries`
 - อัปโหลดต้องผ่าน `validateUpload` (magic bytes + MIME + ext + ≤5MB) และตั้งชื่อไฟล์ใหม่เป็น UUID
+- Guestbook รูปเป็น private: ห้ามคืน public R2 URL; อ่านผ่าน ACL proxy เท่านั้น (owner หรือ APPROVED); `/api/uploads/guestbook/*` บล็อกตรง
+- `guestAccessMode=PUBLIC` แยกจาก PIN cards — การ์ดเดิม default `PIN`; `pinHash` คง non-null เพื่อ compatibility
+- Guestbook entries เป็นข้อมูลสดของ Event — duplicate/Marketplace/CardRevision ห้ามคัดลอกคำอวยพรหรือรูปแขก
 - วันที่ใน DB/API เป็น ISO/ค.ศ. เสมอ — แปลง พ.ศ. เฉพาะ UI ผ่าน `src/lib/thai-date.ts`
 - Template ใหม่ = config ใน `prisma/seed.ts` ประกอบจาก step registry — ห้ามเขียน component ต่อ template
 - Template query API ต้อง validate + จำกัด limit (≤24)

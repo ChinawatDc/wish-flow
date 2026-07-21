@@ -30,6 +30,7 @@ import {
   EnvelopeStep,
   FinalCelebrationStep,
   GiftBoxStep,
+  GuestbookCtaStep,
   TextRevealStep,
   TypewriterStep,
 } from "./text-steps";
@@ -60,6 +61,7 @@ const STEP_REGISTRY: Record<string, ComponentType<StepComponentProps>> = {
   "spin-the-wheel": SpinWheelStep,
   "find-the-gift": FindGiftStep,
   "confetti-pop": ConfettiPopStep,
+  "guestbook-cta": GuestbookCtaStep,
 };
 
 export const KNOWN_STEP_TYPES = REGISTRY_TYPES;
@@ -84,6 +86,8 @@ type Props = {
   data: Record<string, unknown>;
   assets?: StepAsset[];
   initialIndex?: number;
+  eventId?: string;
+  previewMode?: boolean;
   onStepChange?: (index: number, step: StepDef | undefined) => void;
   onComplete?: () => void;
 };
@@ -93,6 +97,8 @@ export function StepRenderer({
   data,
   assets = [],
   initialIndex = 0,
+  eventId,
+  previewMode = false,
   onStepChange,
   onComplete,
 }: Props) {
@@ -157,6 +163,8 @@ export function StepRenderer({
           assets={assets}
           onNext={next}
           isLast={isLast}
+          eventId={eventId}
+          previewMode={previewMode}
         />
       ) : (
         <UnknownStep type={step.type} onNext={next} />

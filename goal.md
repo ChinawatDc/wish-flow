@@ -1,9 +1,9 @@
 # Wish-Flow — Goal Ledger
 
-Focus: G8 Role Dashboard + Card Marketplace  
+Focus: G9 Wedding Guestbook  
 Status: **completed**  
 Last Updated: 2026-07-21  
-Sources: `docs/system-design.md`, `flow.md`, `AGENTS.md`, `docs/adr.md` ADR-7
+Sources: `docs/system-design.md`, `flow.md`, `AGENTS.md`, `docs/adr.md` ADR-8
 
 ---
 
@@ -146,6 +146,22 @@ Sources: `docs/system-design.md`, `flow.md`, `AGENTS.md`, `docs/adr.md` ADR-7
   - `npm run build` — ผ่าน (routes: `/admin`, `/marketplace`, share/marketplace APIs)
   - Guards: cannot_demote_self / cannot_suspend_self / last_admin + UI disable self actions
   - Marketplace: snapshot immutable ตอน publish; ไม่คัดลอก pinHash; useCount นับ unique user
+
+### G9: Wedding Guestbook — DONE 2026-07-21
+- [x] Schema: `guestAccessMode` PIN|PUBLIC + `guestbookEnabled` + `GuestbookEntry` statuses + indexes; migration `20260721220000_g9_guestbook`
+- [x] Storage: R2 adapter (S3-compatible) เมื่อตั้ง `R2_*`; guestbook prefix private; ACL proxy; orphan cleanup รวม guestbook; ลบรูปตอน reject/delete/event delete
+- [x] Public flow: meta/submit/wall/photos + `/e/[id]` PUBLIC landing + `/e/[id]/guestbook` (ชื่อ/รูป optional, กล้องหน้า/หลัง/คลัง, wall polling)
+- [x] Owner: edit toggles + `/events/[id]/wishes` moderation (filter, pagination 10/20/50, bulk ≤50) + notification + audit (ไม่เก็บเนื้อหาคำอวยพรใน metadata)
+- [x] Template: step `guestbook-cta` + seed `wedding-guestbook` (ADR-5 immutable published)
+- [x] Compatibility: PIN cards เดิมไม่พัง; duplicate ไม่คัดลอก entries
+- Spec / ADR: `docs/adr.md` ADR-8
+- **Evidence (2026-07-21):**
+  - Migration `20260721220000_g9_guestbook` applied local Docker `:5435`
+  - Seed: **14 templates** รวม `wedding-guestbook` (published schemas immutable)
+  - `npm test` — **115/115 ผ่าน** (guestbook integration: public submit, ACL, rate limit, bulk, duplicate ไม่คัดลอก entries, audit sanitize)
+  - `npm run build` — ผ่าน (routes: `/e/[id]/guestbook`, `/events/[id]/wishes`, guestbook APIs, R2 storage)
+  - Storage: local default; R2 เมื่อตั้ง `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET`
+  - Deploy note: รัน `prisma migrate deploy` บน Neon + ตั้ง R2 env บน Vercel ก่อนเปิด photo upload จริง
 
 ## Deferred
 

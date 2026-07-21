@@ -222,3 +222,42 @@ export function FinalCelebrationStep({ data }: StepComponentProps) {
     </StepShell>
   );
 }
+
+export function GuestbookCtaStep({
+  data,
+  onNext,
+  isLast,
+  eventId,
+  previewMode,
+}: StepComponentProps) {
+  const title =
+    field(data, "guestbook_cta_title") || "เขียนคำอวยพรให้เราหน่อยนะ";
+  const body =
+    field(data, "guestbook_cta_body") ||
+    "ชื่อและรูปเป็นทางเลือก — ข้อความจะขึ้นกำแพงหลังเจ้าของอนุมัติ";
+  const button = field(data, "guestbook_cta_button") || "ไปสมุดอวยพร";
+
+  return (
+    <StepShell>
+      <p className="text-5xl" aria-hidden>
+        📖
+      </p>
+      <h2 className="text-2xl font-bold text-rose-700">{title}</h2>
+      <p className="max-w-md text-sm text-rose-500">{body}</p>
+      {previewMode || !eventId ? (
+        <div className="rounded-2xl border-2 border-dashed border-rose-200 bg-white/60 px-6 py-3 text-sm text-rose-400">
+          {button} (ตัวอย่าง — ลิงก์จริงตอนแขกเปิดการ์ด)
+        </div>
+      ) : (
+        <a
+          href={`/e/${eventId}/guestbook`}
+          className="rounded-full bg-rose-500 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-rose-200"
+        >
+          {button}
+        </a>
+      )}
+      <NextButton onNext={onNext} isLast={isLast} label="ข้ามไปต่อ" />
+    </StepShell>
+  );
+}
+

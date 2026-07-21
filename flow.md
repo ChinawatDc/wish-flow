@@ -95,8 +95,17 @@ admin:
 | GET | `/api/templates/:slug` | รายละเอียดเทมเพลต |
 | GET | `/api/templates/:slug/preview` | ข้อมูลตัวอย่างสำหรับ preview (ไม่แตะ event จริง) |
 | POST | `/api/e/:id/verify-pin` | guest unlock (rate-limited) |
+| POST | `/api/e/:id/public-enter` | PUBLIC mode: ออก unlock cookie โดยไม่ใช้ PIN |
 | GET | `/api/e/:id/view` | ต้องมี unlock token (+assets) — schema จาก pinned version |
 | POST | `/api/e/:id/telemetry` | guest funnel telemetry (ต้องมี unlock token) |
+| GET | `/api/e/:id/guestbook` | public meta (access mode / canSubmit) |
+| POST | `/api/e/:id/guestbook/submit` | multipart คำอวยพร (+รูป optional); rate limit 5/ชม. |
+| GET | `/api/e/:id/guestbook/wall` | กำแพง APPROVED เท่านั้น (cursor pagination) |
+| GET | `/api/e/:id/guestbook/photos/:entryId` | proxy รูป APPROVED |
+| GET | `/api/events/:id/guestbook` | เจ้าของ: list + counters + filter/pagination |
+| PATCH/DELETE | `/api/events/:id/guestbook/:entryId` | เจ้าของ: moderate / ลบ |
+| POST | `/api/events/:id/guestbook/bulk` | เจ้าของ: bulk ≤50 |
+| GET | `/api/events/:id/guestbook/photos/:entryId` | เจ้าของ: proxy รูปทุกสถานะ |
 | POST | `/api/auth/register` | สมัครด้วยอีเมล/รหัสผ่าน |
 | GET/POST | `/api/auth/[...nextauth]` | Auth.js (Credentials + Google) |
 | POST | `/api/auth/claim-device` | claim การ์ด legacy จาก device cookie ครั้งเดียวหลัง login |

@@ -8,6 +8,10 @@ export type StepComponentProps = {
   assets: StepAsset[];
   onNext: () => void;
   isLast: boolean;
+  /** runtime event id — ใช้ลิงก์ guestbook; preview/studio ไม่ส่ง */
+  eventId?: string;
+  /** true เมื่ออยู่ใน Studio / Marketplace / edit preview */
+  previewMode?: boolean;
 };
 
 export function field(data: Record<string, unknown>, key: string): string {

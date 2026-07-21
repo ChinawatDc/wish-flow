@@ -53,6 +53,18 @@ enum CardListingStatus {
   UNLISTED
 }
 
+enum GuestAccessMode {
+  PIN
+  PUBLIC
+}
+
+enum GuestbookEntryStatus {
+  PENDING
+  APPROVED
+  HIDDEN
+  REJECTED
+}
+
 enum AuditOutcome {
   SUCCESS
   FAILURE
@@ -143,6 +155,7 @@ model User {
   cardListings              CardListing[]     @relation("CardListingOwner")
   cardHearts                CardHeart[]       @relation("CardHeartUser")
   cardUses                  CardUse[]         @relation("CardUseUser")
+  guestbookEntriesModerated GuestbookEntry[]  @relation("GuestbookModerator")
 
   @@map("users")
 }
@@ -268,6 +281,9 @@ model Event {
   status            String           @default("active")
   viewCount         Int              @default(0) @map("view_count")
   expiresAt         DateTime?        @map("expires_at")
+  /// PIN = ต้องกรอก Event PIN; PUBLIC = เปิด guestbook โดยไม่ใช้ PIN
+  guestAccessMode   GuestAccessMode  @default(PIN) @map("guest_access_mode")
+  guestbookEnabled  Boolean          @default(false) @map("guestbook_enabled")
   /// Own-card duplicate lineage (ไม่แตะต้นฉบับ)
   duplicatedFromEventId String?      @map("duplicated_from_event_id") @db.Uuid
   /// Fork จาก marketplace listing/revision
@@ -287,6 +303,7 @@ model Event {
   assets            EventAsset[]
   telemetry         TemplateTelemetryEvent[]
   cardListing       CardListing?     @relation("EventCardListing")
+  guestbookEntries  GuestbookEntry[]
 
   @@index([creatorId])
   @@index([ownerUserId])
@@ -295,6 +312,33 @@ model Event {
   @@index([duplicatedFromEventId])
   @@index([forkedFromListingId])
   @@map("events")
+}
+
+/// คำอวยพรจากแขก (งานแต่ง / อีเวนต์) — ไม่คัดลอกตอน duplicate/marketplace
+model GuestbookEntry {
+  id               String               @id @default(uuid()) @db.Uuid
+  eventId          String               @map("event_id") @db.Uuid
+  displayName      String?              @map("display_name")
+  message          String               @db.Text
+  status           GuestbookEntryStatus @default(PENDING)
+  /// Storage key / URL path ภายใต้ guestbook prefix (ไม่ใช่ public R2 URL)
+  photoUrl         String?              @map("photo_url")
+  photoMimeType    String?              @map("photo_mime_type")
+  photoSizeBytes   Int?                 @map("photo_size_bytes")
+  ipHash           String?              @map("ip_hash")
+  deviceId         String?              @map("device_id")
+  userAgentDigest  String?              @map("user_agent_digest")
+  moderatedByUserId String?             @map("moderated_by_user_id") @db.Uuid
+  moderatedAt      DateTime?            @map("moderated_at")
+  rejectReason     String?              @map("reject_reason")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+  event            Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  moderatedBy      User?                @relation("GuestbookModerator", fields: [moderatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, status, createdAt])
+  @@index([eventId, createdAt])
+  @@map("guestbook_entries")
 }
 
 model EventAccessLog {

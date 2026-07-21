@@ -5,6 +5,7 @@ import {
 import { deleteAllAssetFiles, listAssets } from "@/lib/asset-service";
 import { authErrorResponse, requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/db";
+import { deleteAllGuestbookFiles } from "@/lib/guestbook-service";
 import { jsonError, jsonOk } from "@/lib/http";
 import { updateEventSchema } from "@/lib/validation";
 
@@ -49,6 +50,8 @@ export async function GET(_request: Request, { params }: Params) {
       status: event.status,
       viewCount: event.viewCount,
       expiresAt: event.expiresAt?.toISOString().slice(0, 10) ?? null,
+      guestAccessMode: event.guestAccessMode,
+      guestbookEnabled: event.guestbookEnabled,
       createdAt: event.createdAt.toISOString(),
       updatedAt: event.updatedAt.toISOString(),
       assets,
@@ -117,6 +120,12 @@ export async function PATCH(request: Request, { params }: Params) {
         ...(data.templateId !== undefined ? { templateId: data.templateId } : {}),
         ...(data.templateData !== undefined ? { templateData: data.templateData } : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
+        ...(data.guestAccessMode !== undefined
+          ? { guestAccessMode: data.guestAccessMode }
+          : {}),
+        ...(data.guestbookEnabled !== undefined
+          ? { guestbookEnabled: data.guestbookEnabled }
+          : {}),
       },
     });
 
@@ -134,6 +143,8 @@ export async function PATCH(request: Request, { params }: Params) {
       templateId: result.event.templateId,
       templateData: result.event.templateData,
       status: result.event.status,
+      guestAccessMode: result.event.guestAccessMode,
+      guestbookEnabled: result.event.guestbookEnabled,
       viewCount: result.event.viewCount,
     });
   } catch (error) {
@@ -150,7 +161,10 @@ export async function DELETE(_request: Request, { params }: Params) {
       where: { id, ownerUserId: user.id },
       select: { id: true },
     });
-    if (owned) await deleteAllAssetFiles(id);
+    if (owned) {
+      await deleteAllAssetFiles(id);
+      await deleteAllGuestbookFiles(id);
+    }
 
     const result = await deleteOwnedEvent(user.id, id);
     if ("error" in result) return jsonError("ไม่พบอีเวนต์นี้", 404);

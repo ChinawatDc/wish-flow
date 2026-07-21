@@ -28,3 +28,13 @@ export const AUDIT_LOG_RETENTION_DAYS = 365;
 export const SYSTEM_LOG_ERROR_RETENTION_DAYS = 180;
 export const SYSTEM_LOG_INFO_RETENTION_DAYS = 30;
 export const SUPPORT_PRIVACY_RETENTION_DAYS = 30; // ล้าง ipHash/userAgentDigest หลังปิดเคส
+
+// ---- G9: Guestbook ----
+export const GUESTBOOK_DEVICE_COOKIE = "wf_guestbook_device";
+export const GUESTBOOK_RATE_LIMIT = 5;
+export const GUESTBOOK_RATE_WINDOW_MS = 60 * 60 * 1000;
+export const GUESTBOOK_MESSAGE_MAX_LENGTH = 1000;
+export const GUESTBOOK_NAME_MAX_LENGTH = 80;
+export const GUESTBOOK_BULK_MAX = 50;
+export const GUESTBOOK_WALL_LIMIT_MAX = 24;
+export const GUESTBOOK_POLL_INTERVAL_MS = 8000;

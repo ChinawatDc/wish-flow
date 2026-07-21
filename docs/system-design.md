@@ -160,7 +160,8 @@ CREATE TABLE event_assets (
 > - `template_versions`: published snapshot immutable (Draft/Published/Deprecated/Archived) + `events.template_version_id` pin — publish version ใหม่ไม่กระทบ event เดิม
 > - `template_assets`, `template_telemetry_events` (guest funnel หลัง unlock, เก็บ device class ไม่เก็บ raw UA/IP)
 > - **Card Marketplace:** `card_listings` + immutable `card_revisions` (+ assets copies) + `card_hearts` / `card_uses` (unique ต่อ user) — แยกจาก TemplateVersion; ไม่คัดลอก Event PIN
-> ดู `prisma/schema.prisma` และ `docs/adr.md` ADR-4/ADR-5/ADR-7
+> - **Guestbook (G9):** `events.guest_access_mode` (`PIN`|`PUBLIC`) + `guestbook_enabled`; `guestbook_entries` (PENDING/APPROVED/HIDDEN/REJECTED) — ข้อมูลสดของ Event ไม่เข้า marketplace/duplicate; รูป private ผ่าน R2/local + ACL proxy
+> ดู `prisma/schema.prisma` และ `docs/adr.md` ADR-4/ADR-5/ADR-7/ADR-8
 
 **ทำไมออกแบบแบบนี้ (เผื่อระบบใหญ่):**
 - `templates.steps_schema` เป็น JSONB → เพิ่ม template ใหม่ = insert row ใหม่ ไม่ต้อง migrate table

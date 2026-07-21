@@ -116,6 +116,7 @@ export default function GuestViewPage() {
             steps={data.template.stepsSchema.steps}
             data={data.templateData}
             assets={data.assets ?? []}
+            eventId={id}
             onStepChange={(index, step: StepDef | undefined) => {
               if (!step) return;
               track({
